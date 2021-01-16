@@ -31,6 +31,5 @@ fn main() {
     let proof: Vec<u8> = decode(&b64_proof).unwrap();
     let computed: Vec<u8> = hash_mht_subtree_hashes(&seed, &proof);
     let b64_computed = encode(computed);
-    println!("computed is: {}, and expect is: {}", b64_computed, b64_expect);
     assert_eq!(b64_computed, b64_expect);
 }

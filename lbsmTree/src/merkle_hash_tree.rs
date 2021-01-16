@@ -43,13 +43,20 @@ fn append_hash(store: &mut impl Storer, h: Vec<u8>) {
 mod tests {
     use super::*;
     use crate::merkle_hash_tree::mem_store::MemStore;
-    use std::str::from_utf8;
 
     #[test]
     fn test_root() {
-        let mem_store: MemStore = Storer::new();
-        let expected: Vec<u8> = digest(Algorithm::SHA256, &[]);
-        let computed: Vec<u8> = root(&mem_store);
-        assert_eq!(expected, computed);
+        let mut mem_store: MemStore = Storer::new();
+        let expected_1: Vec<u8> = digest(Algorithm::SHA256, &[]);
+        let computed_1: Vec<u8> = root(&mem_store);
+        assert_eq!(expected_1, computed_1);
+
+        // let value: Vec<u8> = vec![104, 101, 108, 108, 109];
+        // println!("depth is: {}", depth(&mem_store));
+        // append(&mut mem_store, value.to_vec());
+        // println!("depth is: {}", depth(&mem_store));
+        // let expected_2: Vec<u8> = leaf_hash(value.to_vec());
+        // let computed_2: Vec<u8> = root(&mem_store);
+        // assert_eq!(expected_2, computed_2);
     }
 }

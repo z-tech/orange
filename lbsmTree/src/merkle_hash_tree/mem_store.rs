@@ -19,16 +19,19 @@ impl Storer for MemStore {
         return self.data[0].len();
     }
     fn set(&mut self, layer: usize, index: usize, value: Vec<u8>) {
-        while self.data.len() < layer {
+        while self.data.len() <= layer {
             self.data.push(Vec::new());
         }
-        while self.data[layer].len() < index {
+        while self.data[layer].len() <= index {
             self.data[layer].push(Vec::new());
         }
-        self.data[layer][index] = value;
+        self.data[layer][index].extend(value.iter().cloned());
     }
     fn get(&self, layer: usize, index: usize) -> Option<&Vec<u8>> {
         if layer >= self.data.len() || index >= self.data[layer].len() {
+            return None;
+        }
+        if self.data[layer][index].len() == 0 {
             return None;
         }
         return Some(&self.data[layer][index]);
