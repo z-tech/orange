@@ -12,7 +12,7 @@ pub struct MemStore {
 impl Storer for MemStore {
     fn new() -> MemStore {
         return MemStore {
-            data: vec![vec![vec![]]],
+            data: vec![],
         };
     }
     fn size(&self) -> usize {
@@ -21,9 +21,6 @@ impl Storer for MemStore {
     fn set(&mut self, layer: usize, index: usize, value: Vec<u8>) {
         while self.data.len() <= layer {
             self.data.push(Vec::new());
-        }
-        while self.data[layer].len() <= index {
-            self.data[layer].push(Vec::new());
         }
         self.data[layer][index].extend(value.iter().cloned());
     }
