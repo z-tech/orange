@@ -15,10 +15,11 @@ fn depth(store: &impl Storer) -> usize {
 }
 
 fn root(store: &impl Storer) -> Vec<u8> {
-    let h_opt: Option<&Vec<u8>> = store.get(depth(store), 0);
-    if h_opt == None {
+    let d: usize = depth(store);
+    if d == 0 {
         return digest(Algorithm::SHA256, &[]);
     }
+    let h_opt: Option<&Vec<u8>> = store.get(depth(store)-1, 0);
     return h_opt.unwrap().to_vec();
 }
 
@@ -45,6 +46,7 @@ fn append_hash(store: &mut impl Storer, h: Vec<u8>) {
     let mut c: Vec<u8> = h.to_vec();
     let mut t: Vec<u8> = Vec::new();
     while s > 1 {
+        println!("REBUILDING ROOT");
         if s % 2 == 0 {
             t.resize(1, MMR_NODE_PREFIX);
             t.extend(store.get(i, s-2).unwrap().iter().cloned());
@@ -76,11 +78,9 @@ mod tests {
         assert_eq!(expected_1, computed_1);
 
         let value: Vec<u8> = vec![104, 101, 108, 108, 109];
-        println!("depth is: {}", depth(&mem_store));
         append(&mut mem_store, value.to_vec());
-        // println!("depth is: {}", depth(&mem_store));
-        // let expected_2: Vec<u8> = leaf_hash(value.to_vec());
-        // let computed_2: Vec<u8> = root(&mem_store);
-        // assert_eq!(expected_2, computed_2);
+        let expected_2: Vec<u8> = leaf_hash(value.to_vec());
+        let computed_2: Vec<u8> = root(&mem_store);
+        assert_eq!(expected_2, computed_2);
     }
 }
