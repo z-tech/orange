@@ -19,7 +19,7 @@ fn root(store: &impl Storer) -> Vec<u8> {
     if d == 0 {
         return digest(Algorithm::SHA256, &[]);
     }
-    let h_opt: Option<&Vec<u8>> = store.get(depth(store)-1, 0);
+    let h_opt: Option<&Vec<u8>> = store.get(d-1, 0);
     return h_opt.unwrap().to_vec();
 }
 
@@ -46,7 +46,6 @@ fn append_hash(store: &mut impl Storer, h: Vec<u8>) {
     let mut c: Vec<u8> = h.to_vec();
     let mut t: Vec<u8> = Vec::new();
     while s > 1 {
-        println!("REBUILDING ROOT");
         if s % 2 == 0 {
             t.resize(1, MMR_NODE_PREFIX);
             t.extend(store.get(i, s-2).unwrap().iter().cloned());
