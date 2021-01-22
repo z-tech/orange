@@ -1,5 +1,5 @@
 use crypto_hash::{Algorithm, digest};
-use std::convert::TryInto;
+use std::convert::TryFrom;
 
 use crate::merkle_mountain_range::mem_store::Storer;
 
@@ -8,18 +8,21 @@ pub mod mem_store;
 const MMR_LEAF_PREFIX: u8 = 0;
 const MMR_NODE_PREFIX: u8 = 1;
 
-fn depth(store: &impl Storer) -> usize {
-    let s: usize = store.size();
+fn depth(store: &impl Storer) -> isize {
+    let s: isize = isize::try_from(store.size()).unwrap() - 1;
+    if s == -1 {
+        return -1;
+    }
     let bits: u32 = s.count_ones() + s.count_zeros();
-    return (bits - s.leading_zeros()).try_into().unwrap();
+    return isize::try_from(bits - s.leading_zeros()).unwrap();
 }
 
 fn root(store: &impl Storer) -> Vec<u8> {
-    let d: usize = depth(store);
-    if d == 0 {
+    let d: isize = depth(store);
+    if d == -1 {
         return digest(Algorithm::SHA256, &[]);
     }
-    let h_opt: Option<&Vec<u8>> = store.get(d-1, 0);
+    let h_opt: Option<&Vec<u8>> = store.get(usize::try_from(d).unwrap(), 0);
     return h_opt.unwrap().to_vec();
 }
 
