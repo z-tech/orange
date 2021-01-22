@@ -9,10 +9,11 @@ const MMR_LEAF_PREFIX: u8 = 0;
 const MMR_NODE_PREFIX: u8 = 1;
 
 fn depth(store: &impl Storer) -> isize {
-    let s: isize = isize::try_from(store.size()).unwrap() - 1;
-    if s == -1 {
+    let mut s: isize = isize::try_from(store.size()).unwrap();
+    if s == 0 {
         return -1;
     }
+    s -= 1;
     let bits: u32 = s.count_ones() + s.count_zeros();
     return isize::try_from(bits - s.leading_zeros()).unwrap();
 }
