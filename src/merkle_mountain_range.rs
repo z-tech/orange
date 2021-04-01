@@ -9,7 +9,7 @@ const MMR_LEAF_PREFIX: u8 = 0;
 const MMR_NODE_PREFIX: u8 = 1;
 
 fn depth(store: &impl Storer) -> isize {
-    let mut s: isize = isize::try_from(store.size()).unwrap();
+    let mut s: isize = store.width();
     if s == 0 {
         return -1;
     }
@@ -23,7 +23,7 @@ fn root(store: &impl Storer) -> Vec<u8> {
     if d == -1 {
         return digest(Algorithm::SHA256, &[]);
     }
-    let h_opt: Option<&Vec<u8>> = store.get(usize::try_from(d).unwrap(), 0);
+    let h_opt: Option<&Vec<u8>> = store.get(d, 0);
     return h_opt.unwrap().to_vec();
 }
 
@@ -41,12 +41,12 @@ fn append(store: &mut impl Storer, data: Vec<u8>) {
 
 fn append_hash(store: &mut impl Storer, h: Vec<u8>) {
     // append the leaf
-    let mut s: usize = store.size();
+    let mut s: isize = store.width();
     store.set(0, s, h.to_vec());
     s += 1;
 
     // rebuild the root
-    let mut i: usize = 0;
+    let mut i: isize = 0;
     let mut c: Vec<u8> = h.to_vec();
     let mut t: Vec<u8> = Vec::new();
     while s > 1 {
@@ -74,12 +74,15 @@ mod tests {
     use crate::merkle_mountain_range::mem_store::MemStore;
 
     #[test]
-    fn test_root() {
-        let mut mem_store: MemStore = Storer::new();
+    fn test_root_of_empty_tree() {
+        let mem_store: MemStore = Storer::new();
         let expected_1: Vec<u8> = digest(Algorithm::SHA256, &[]);
         let computed_1: Vec<u8> = root(&mem_store);
         assert_eq!(expected_1, computed_1);
-
+    }
+    #[test]
+    fn test_root_of_tree_with_one_node() {
+        let mut mem_store: MemStore = Storer::new();
         let value: Vec<u8> = vec![104, 101, 108, 108, 109];
         append(&mut mem_store, value.to_vec());
         let expected_2: Vec<u8> = leaf_hash(value.to_vec());
