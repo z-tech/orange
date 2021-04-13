@@ -1,1 +1,1 @@
-mod merkle_mountain_range;
+mod merkle_hash_tree;
