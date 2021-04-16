@@ -13,14 +13,18 @@ fn depth(store: &impl Storer) -> isize {
         return -1;
     }
     width -= 1;
-    let total_bits: u32 = width.count_ones() + width.count_zeros(); // not ideal, but see isize::BITS
+    /*
+        there's an isize::BITS function that does this, but it is only a "nightly" build,
+        so just working around that for now with count_ones() and count_zeros()
+    */
+    let total_bits: u32 = width.count_ones() + width.count_zeros();
     return (total_bits - width.leading_zeros()) as isize;
 }
 
 fn root(store: &impl Storer) -> Vec<u8> {
     let depth: isize = depth(store);
     if depth == -1 {
-        return digest(Algorithm::SHA256, b""); // TODO: this is hash of nil?
+        return digest(Algorithm::SHA256, b"");
     }
     return store.get(depth, 0).unwrap();
 }
@@ -63,6 +67,10 @@ fn append_hash(store: &mut impl Storer, leaf_hash: Vec<u8>) {
         }
     }
 }
+
+// fn is_frozen() {
+//
+// }
 
 #[cfg(test)]
 mod tests {
