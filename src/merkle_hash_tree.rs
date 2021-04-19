@@ -3,6 +3,7 @@ use crypto_hash::{Algorithm, digest};
 use crate::merkle_hash_tree::mem_store::Storer;
 
 pub mod mem_store;
+pub mod test_data;
 
 const MHT_LEAF_PREFIX: u8 = 0;
 const MHT_NODE_PREFIX: u8 = 1;
@@ -68,29 +69,33 @@ fn append_hash(store: &mut impl Storer, leaf_hash: Vec<u8>) {
     }
 }
 
-// fn is_frozen() {
-//
-// }
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::merkle_hash_tree::mem_store::MemStore;
+    use crate::merkle_hash_tree::test_data;
 
     #[test]
-    fn test_root_of_empty_tree() {
-        let mem_store: MemStore = Storer::new();
-        let expected_1: Vec<u8> = digest(Algorithm::SHA256, b"");
-        let computed_1: Vec<u8> = root(&mem_store);
-        assert_eq!(expected_1, computed_1);
+    fn test_append() {
+        let mut ms: MemStore = Storer::new();
+        assert_eq!(-1, depth(&ms));
+        for index in 0..64 {
+            let b: Vec<u8> = index.to_string().as_bytes().to_vec();
+            append(&mut ms, b);
+
+            assert_eq!(index as isize, ms.width()-1);
+            let d: f64 = ((index + 1) as f64).log2().ceil();
+            assert_eq!(d as isize, depth(&ms));
+
+            assert_eq!(test_data::get_test_roots()[index as usize], root(&ms));
+        }
     }
     #[test]
-    fn test_root_of_tree_with_one_node() {
-        let mut mem_store: MemStore = Storer::new();
-        let value: Vec<u8> = vec![104, 101, 108, 108, 109];
-        append(&mut mem_store, value.to_vec());
-        let expected_2: Vec<u8> = hash_leaf(value.to_vec());
-        let computed_2: Vec<u8> = root(&mem_store);
-        assert_eq!(expected_2, computed_2);
+    fn test_root() {
+        let mut ms: MemStore = Storer::new();
+        assert_eq!(digest(Algorithm::SHA256, b""), root(&ms));
+        let value: Vec<u8> = "my value".as_bytes().to_vec();
+        append(&mut ms, value.to_vec());
+        assert_eq!(hash_leaf(value), root(&ms));
     }
 }
