@@ -21,7 +21,7 @@ impl Storer for MemStore {
     /*
         Note: width of the tree tells us how many values are in the ledger
         e.g.
-         root h        <-- nth layer containg the root
+         root h        <-- n-1th layer containg the root
          \      \
          h       h     <-- layer 1, containing internal nodes
         \   \   \   \
