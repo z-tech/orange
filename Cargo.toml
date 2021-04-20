@@ -2,6 +2,11 @@
 name = "tbd"
 version = "0.0.1"
 edition = "2018"
+
+[lib]
+name = "merkle_hash_tree"
+path = "src/lib.rs"
+
 [dependencies]
 base64 = "0.13.0"
 crypto-hash = "0.3.4"
