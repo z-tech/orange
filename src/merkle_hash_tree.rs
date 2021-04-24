@@ -19,7 +19,7 @@ fn min_num_bits(x: isize) -> isize {
 }
 
 fn depth(store: &impl Storer) -> isize {
-    let mut width: isize = store.width();
+    let width: isize = store.width();
     if width == 0 {
         return -1;
     }
@@ -99,55 +99,63 @@ fn hash_at(store: &mut impl Storer, l: isize, r: isize, at: isize) -> Vec<u8> {
 }
 
 // Reference implementation as per https://tools.ietf.org/html/rfc6962#section-2.1
-fn MTH(D: Vec<Vec<u8>>) -> Vec<u8> {
-    let n: isize = isize::try_from(D.len()).unwrap();
+fn mth(d: Vec<Vec<u8>>) -> Vec<u8> {
+    let n: isize = isize::try_from(d.len()).unwrap();
     if n == 0 {
         return digest(Algorithm::SHA256, b"");
     }
     if n == 1 {
         let mut c: Vec<u8> = Vec::new();
         c.push(MHT_LEAF_PREFIX);
-        c.extend(D[0].to_vec());
+        c.extend(d[0].to_vec());
         return digest(Algorithm::SHA256, &c);
     }
 
     let k: usize = 1 << (min_num_bits(n - 1) - 1);
     let mut c: Vec<u8> = Vec::new();
     c.push(MHT_NODE_PREFIX);
-    c.extend(MTH(D[0..k].to_vec()));
-    c.extend(MTH(D[k..(n as usize)].to_vec()));
+    c.extend(mth(d[0..k].to_vec()));
+    c.extend(mth(d[k..(n as usize)].to_vec()));
     return digest(Algorithm::SHA256, &c);
 }
 
-fn MPath(m: isize, D: Vec<Vec<u8>>) -> Option<Vec<Vec<u8>>> {
-    let n: isize = isize::try_from(D.len()).unwrap();
+fn mpath(m: isize, d: Vec<Vec<u8>>) -> Option<Vec<Vec<u8>>> {
+    let n: isize = isize::try_from(d.len()).unwrap();
     if 0 > m || m >= n {
         return None;
     }
     if n == 1 && m == 0 {
-        return None;
+        return Some(vec![]);
     }
 
-    let mut path: Vec<Vec<u8>> = Vec::new();
-    let k: isize = 1 << (min_num_bits(n - 1) - 1);
 
+    let k: isize = 1 << (min_num_bits(n - 1) - 1);
+    let mut path: Vec<Vec<u8>> = Vec::new();
+    let sub_path_option: Option<Vec<Vec<u8>>>;
     if m < k {
-        path.extend(MPath(m, D[0..k as usize].to_vec()).unwrap());
-        path.push(MTH(D[k as usize .. n as usize].to_vec()));
+        sub_path_option = mpath(m, d[0..k as usize].to_vec());
+        if sub_path_option != None {
+            path.extend(sub_path_option.unwrap());
+        }
+        path.push(mth(d[k as usize .. n as usize].to_vec()));
     } else {
-        path.extend(MPath(m-k, D[k as usize..n as usize].to_vec()).unwrap());
-        path.push(MTH(D[0..k as usize].to_vec()));
+        sub_path_option = mpath(m-k, d[k as usize..n as usize].to_vec());
+        if sub_path_option != None {
+            path.extend(sub_path_option.unwrap());
+        }
+        path.push(mth(d[0..k as usize].to_vec()));
     }
     return Some(path);
 }
 
 fn inclusion_proof(store: &mut impl Storer, at: isize, i: isize) -> Option<Vec<Vec<u8>>> {
     let w: isize = store.width();
+    if at == 0 && i == 0 {
+        return Some(vec![]);
+    }
     if i > at || at >= w || at < 1 {
         return None;
     }
-
-    let mut p: Vec<Vec<u8>> = Vec::new();
 
     let mut m: isize = i;
     let mut n: isize = at + 1;
@@ -155,23 +163,23 @@ fn inclusion_proof(store: &mut impl Storer, at: isize, i: isize) -> Option<Vec<V
     let mut offset: isize = 0;
     let mut l: isize;
     let mut r: isize;
+    let mut p: Vec<Vec<u8>> = Vec::new();
     loop {
         let d: isize = min_num_bits(n - 1);
         let k: isize = 1 << (d - 1);
         if m < k {
             l = offset + k;
-            r = offset+n-1;
+            r = offset + n - 1;
             n = k;
         } else {
             l = offset;
-            r = offset+k-1;
+            r = offset + k - 1;
             m = m - k;
             n = n - k;
             offset += k;
         }
 
-        p.push(hash_at(store, l, r, at));
-
+        p.insert(0, hash_at(store, l, r, at));
         if n < 1 || (n == 1 && m == 0) {
             return Some(p);
         }
@@ -219,61 +227,60 @@ mod tests {
         assert_eq!(is_frozen(1, 0, 6), true);
         assert_eq!(is_frozen(1, 1, 6), true);
         assert_eq!(is_frozen(1, 2, 6), true);
+        assert_eq!(is_frozen(1, 3, 6), false);
+        assert_eq!(is_frozen(0, 0, 6), true);
+        assert_eq!(is_frozen(0, 1, 6), true);
+        assert_eq!(is_frozen(0, 2, 6), true);
+        assert_eq!(is_frozen(0, 3, 6), true);
+        assert_eq!(is_frozen(0, 4, 6), true);
+        assert_eq!(is_frozen(0, 5, 6), true);
+        assert_eq!(is_frozen(0, 6, 6), true);
+        assert_eq!(is_frozen(0, 7, 6), false);
     }
     #[test]
-    fn test_MTH() {
-        let mut D: Vec<Vec<u8>> = Vec::new();
-        assert_eq!(digest(Algorithm::SHA256, b""), MTH(D.to_vec()));
+    fn test_mth() {
+        let mut d: Vec<Vec<u8>> = Vec::new();
+        assert_eq!(digest(Algorithm::SHA256, b""), mth(d.to_vec()));
         for index in 0..=64 {
             let b: Vec<u8> = index.to_string().as_bytes().to_vec();
-            D.push(b);
-            assert_eq!(test_data::get_test_roots()[index as usize], MTH(D.to_vec()));
+            d.push(b);
+            assert_eq!(test_data::get_test_roots()[index as usize], mth(d.to_vec()));
         }
     }
-    fn test_MPath() {
-        let mut D: Vec<Vec<u8>> = Vec::new();
-        assert_eq!(None, MPath(0, D.to_vec()));
+    #[test]
+    fn test_mpath() {
+        let mut d: Vec<Vec<u8>> = Vec::new();
+        assert_eq!(None, mpath(0, d.to_vec()));
         for index in 0..=8 {
             let b: Vec<u8> = index.to_string().as_bytes().to_vec();
-            D.push(b);
-            assert_eq!(None, MPath(index + 1, D.to_vec())); // undefined path
+            d.push(b);
+            assert_eq!(None, mpath(index + 1, d.to_vec())); // undefined path
             for i in 0..=index {
-                let path: Vec<Vec<u8>> = MPath(i, D.to_vec()).unwrap();
+                let path: Vec<Vec<u8>> = mpath(i, d.to_vec()).unwrap();
                 assert_eq!(test_data::get_test_paths()[index as usize][i as usize], path);
             }
         }
     }
-    // #[test]
-    // fn test_inclusion_proof() {
-    //     let mut ms: MemStore = Storer::new();
-    //     let mut D: Vec<Vec<u8>> = Vec::new();
-    //     for index in 0..=64 {
-    //         let v: Vec<u8> = index.to_string().as_bytes().to_vec();
-    //         D.push(v.to_vec());
-    //         append(&mut ms, v);
-    //
-    //         // test out of range
-    //         assert_eq!(inclusion_proof(&mut ms, index + 1, index), None);
-    //         assert_eq!(inclusion_proof(&mut ms, index, index + 1), None);
-    //
-    //         for at in 0..=index {
-    //             for i in 0..=at {
-    //                 println!("{},{},{}", index, at, i);
-    //                 let expected_option: Option<Vec<Vec<u8>>> = MPath(i, D[0..(at as usize+1)].to_vec());
-    //                 let path_option: Option<Vec<Vec<u8>>> = inclusion_proof(&mut ms, at, i);
-    //                 if path_option == None {
-    //                     assert_eq!(path_option, expected_option);
-    //                 } else {
-    //                     let path: Vec<Vec<u8>> = path_option.unwrap();
-    //                     let expected: Vec<Vec<u8>> = expected_option.unwrap();
-    //                     assert_eq!(path.len(), expected.len());
-    //
-    //                     for j in 0..path.len() {
-    //                         assert_eq!(expected[j], path[j]);
-    //                     }
-    //                 }
-    //             }
-    //         }
-    //     }
-    // }
+    #[test]
+    fn test_inclusion_proof() {
+        let mut ms: MemStore = Storer::new();
+        let mut d: Vec<Vec<u8>> = Vec::new();
+        for index in 0..=64 {
+            let v: Vec<u8> = index.to_string().as_bytes().to_vec();
+            d.push(v.to_vec());
+            append(&mut ms, v);
+
+            // test out of range
+            assert_eq!(inclusion_proof(&mut ms, index + 1, index), None);
+            assert_eq!(inclusion_proof(&mut ms, index, index + 1), None);
+
+            for at in 0..=index {
+                for i in 0..=at {
+                    let path_option: Option<Vec<Vec<u8>>> = inclusion_proof(&mut ms, at, i);
+                    let expected_option: Option<Vec<Vec<u8>>> = mpath(i, d[0..(at+1) as usize].to_vec());
+                    assert_eq!(path_option, expected_option);
+                }
+            }
+        }
+    }
 }
