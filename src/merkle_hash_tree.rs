@@ -27,7 +27,6 @@ impl<T: Storer> MerkleHashTree<T> {
         let total_bits: u32 = x.count_ones() + x.count_zeros();
         return (total_bits - x.leading_zeros()) as isize;
     }
-
     fn depth(&self) -> isize {
         /*
             canonically, a tree of size zero has depth of negative one
@@ -41,7 +40,6 @@ impl<T: Storer> MerkleHashTree<T> {
         */
         return MerkleHashTree::<T>::min_num_bits(width - 1);
     }
-
     fn root(&self) -> Vec<u8> {
         /*
             per RFC the root hash of an empty tree is hash of empty string
@@ -59,11 +57,9 @@ impl<T: Storer> MerkleHashTree<T> {
         buf.extend(data.iter().cloned());
         return digest(Algorithm::SHA256, &buf);
     }
-
     fn append(&mut self, data: Vec<u8>) {
         self.append_hash(self.hash_leaf(data));
     }
-
     fn append_hash(&mut self, leaf_hash: Vec<u8>) {
         // append the leaf
         let mut width: isize = self.store.width();
@@ -91,7 +87,6 @@ impl<T: Storer> MerkleHashTree<T> {
             }
         }
     }
-
     fn is_frozen(layer: isize, index: isize, at: isize) -> bool {
         /*
             when a left subtree becomes perfect 2^i, it becomes "frozen"
@@ -99,7 +94,6 @@ impl<T: Storer> MerkleHashTree<T> {
         let a: isize = 1 << layer; // 6 -> 64, 7 -> 128 etc
         return at >= index * a + a - 1;
     }
-
     fn hash_at(&self, l: isize, r: isize, at: isize) -> Vec<u8> {
         if r == l {
             return self.store.get(0, r).unwrap();
@@ -119,9 +113,11 @@ impl<T: Storer> MerkleHashTree<T> {
         c.extend(self.hash_at(l+k, r, at).iter().cloned());
         return digest(Algorithm::SHA256, &c);
     }
-
-    // Reference implementation as per https://tools.ietf.org/html/rfc6962#section-2.1
     fn mth(d: Vec<Vec<u8>>) -> Vec<u8> {
+        /*
+            note this is to test against the reference implementation as per
+                https://tools.ietf.org/html/rfc6962#section-2.1
+        */
         let n: isize = isize::try_from(d.len()).unwrap();
         if n == 0 {
             return digest(Algorithm::SHA256, b"");
