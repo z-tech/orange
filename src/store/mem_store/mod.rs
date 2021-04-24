@@ -1,12 +1,6 @@
 use std::convert::TryFrom;
 
-pub trait Storer {
-    fn new() -> Self;
-    fn width(&self) -> isize;
-    fn set(&mut self, layer: isize, index: isize, value: Vec<u8>);
-    fn get(&self, layer: isize, index: isize) -> Option<Vec<u8>>;
-    fn print(&self);
-}
+use crate::store::Storer;
 
 pub struct MemStore {
     data: Vec<Vec<Vec<u8>>>
@@ -80,12 +74,12 @@ mod tests {
 
     #[test]
     fn empty_tree_width_is_0() {
-        let mem_store: MemStore = Storer::new();
+        let mem_store: MemStore = MemStore::new();
         assert_eq!(mem_store.width(), 0);
     }
     #[test]
     fn tree_width_is_correct() {
-        let mut mem_store: MemStore = Storer::new();
+        let mut mem_store: MemStore = MemStore::new();
         let value: Vec<u8> = vec![104, 101, 108, 108, 109];
         mem_store.set(0, 0, value.to_vec());
         assert_eq!(mem_store.width(), 1);
@@ -96,21 +90,21 @@ mod tests {
     }
     #[test]
     fn get_and_retrieve_from_non_zeroeth_layer() {
-        let mut mem_store: MemStore = Storer::new();
+        let mut mem_store: MemStore = MemStore::new();
         let value: Vec<u8> = vec![104, 101, 108, 108, 109];
         mem_store.set(1, 0, value.to_vec());
         assert_eq!(mem_store.get(1, 0).unwrap().to_vec(), value);
     }
     #[test]
     fn get_from_non_existent_layer_index() {
-        let mut mem_store: MemStore = Storer::new();
+        let mut mem_store: MemStore = MemStore::new();
         let value: Vec<u8> = vec![104, 101, 108, 108, 109];
         mem_store.set(1, 0, value.to_vec());
         assert_eq!(mem_store.get(1, 1).is_none(), true);
     }
     #[test]
     fn print_tree() {
-        let mut mem_store: MemStore = Storer::new();
+        let mut mem_store: MemStore = MemStore::new();
         let mut value: Vec<u8> = vec![6];
         mem_store.set(0, 0, value.to_vec());
         value[0] = 5;
