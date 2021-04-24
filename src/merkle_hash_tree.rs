@@ -19,14 +19,23 @@ fn min_num_bits(x: isize) -> isize {
 }
 
 fn depth(store: &impl Storer) -> isize {
+    /*
+        canonically, a tree of size zero has depth of negative one
+    */
     let width: isize = store.width();
     if width == 0 {
         return -1;
     }
+    /*
+        note that width is num leaves in tree, min_num_bits(width) is essentially log2 operation
+    */
     return min_num_bits(width - 1);
 }
 
 fn root(store: &impl Storer) -> Vec<u8> {
+    /*
+        per RFC the root hash of an empty tree is hash of empty string
+    */
     let depth: isize = depth(store);
     if depth == -1 {
         return digest(Algorithm::SHA256, b"");
@@ -74,6 +83,9 @@ fn append_hash(store: &mut impl Storer, leaf_hash: Vec<u8>) {
 }
 
 fn is_frozen(layer: isize, index: isize, at: isize) -> bool {
+    /*
+        when a left subtree becomes perfect 2^i, it becomes "frozen"
+    */
     let a: isize = 1 << layer; // 6 -> 64, 7 -> 128 etc
     return at >= index * a + a - 1;
 }
