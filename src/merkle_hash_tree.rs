@@ -5,14 +5,13 @@ use crate::merkle_hash_tree::mem_store::Storer;
 pub mod mem_store;
 pub mod test_data; // TODO(z-tech) fix this
 
-const MHT_LEAF_PREFIX: u8 = 0; // TODO(z-tech) fix these
-const MHT_NODE_PREFIX: u8 = 1;
-
 struct MerkleHashTree<T: Storer> {
     pub store: T,
 }
 
 impl<T: Storer> MerkleHashTree<T> {
+    const MHT_LEAF_PREFIX: u8 = 0;
+    const MHT_NODE_PREFIX: u8 = 1;
     fn new(s: T) -> MerkleHashTree<T> {
         return MerkleHashTree {
             store: s,
@@ -51,7 +50,7 @@ impl<T: Storer> MerkleHashTree<T> {
     }
     fn hash_leaf(&self, data: Vec<u8>) -> Vec<u8> {
         let mut buf: Vec<u8> = Vec::new();
-        buf.push(MHT_LEAF_PREFIX);
+        buf.push(MerkleHashTree::<T>::MHT_LEAF_PREFIX);
         buf.extend(data.iter().cloned());
         return digest(Algorithm::SHA256, &buf);
     }
@@ -70,7 +69,7 @@ impl<T: Storer> MerkleHashTree<T> {
         let mut t: Vec<u8> = Vec::new();
         while width > 1 {
             if width % 2 == 0 {
-                t.resize(1, MHT_NODE_PREFIX);
+                t.resize(1, MerkleHashTree::<T>::MHT_NODE_PREFIX);
                 t.extend(self.store.get(i, width-2).unwrap());
                 t.extend(c.to_vec());
                 c.resize(0, 0);
@@ -106,7 +105,7 @@ impl<T: Storer> MerkleHashTree<T> {
 
         let k: isize = a / 2;
         let mut c: Vec<u8> = Vec::new();
-        c.push(MHT_NODE_PREFIX);
+        c.push(MerkleHashTree::<T>::MHT_NODE_PREFIX);
         c.extend(self.hash_at(l, l+k-1, at).iter().cloned());
         c.extend(self.hash_at(l+k, r, at).iter().cloned());
         return digest(Algorithm::SHA256, &c);
@@ -156,7 +155,7 @@ impl<T: Storer> MerkleHashTree<T> {
         let mut h: Vec<u8> = leaf;
         for p in path.iter() {
             let mut c: Vec<u8> = Vec::new();
-            c.push(MHT_NODE_PREFIX);
+            c.push(MerkleHashTree::<T>::MHT_NODE_PREFIX);
             if i % 2 == 0 && i != at {
                 c.extend(h.iter().cloned());
                 c.extend(p);
@@ -235,14 +234,14 @@ mod tests {
         }
         if n == 1 {
             let mut c: Vec<u8> = Vec::new();
-            c.push(MHT_LEAF_PREFIX);
+            c.push(MerkleHashTree::<MemStore>::MHT_LEAF_PREFIX);
             c.extend(d[0].to_vec());
             return digest(Algorithm::SHA256, &c);
         }
 
         let k: usize = 1 << (MerkleHashTree::<MemStore>::min_num_bits(n - 1) - 1);
         let mut c: Vec<u8> = Vec::new();
-        c.push(MHT_NODE_PREFIX);
+        c.push(MerkleHashTree::<MemStore>::MHT_NODE_PREFIX);
         c.extend(mth(d[0..k].to_vec()));
         c.extend(mth(d[k..(n as usize)].to_vec()));
         return digest(Algorithm::SHA256, &c);
