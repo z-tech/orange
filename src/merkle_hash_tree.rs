@@ -3,9 +3,9 @@ use crypto_hash::{Algorithm, digest};
 use crate::merkle_hash_tree::mem_store::Storer;
 
 pub mod mem_store;
-pub mod test_data;
+pub mod test_data; // TODO(z-tech) fix this
 
-const MHT_LEAF_PREFIX: u8 = 0;
+const MHT_LEAF_PREFIX: u8 = 0; // TODO(z-tech) fix these
 const MHT_NODE_PREFIX: u8 = 1;
 
 struct MerkleHashTree<T: Storer> {
@@ -49,7 +49,6 @@ impl<T: Storer> MerkleHashTree<T> {
         }
         return self.store.get(depth, 0).unwrap();
     }
-
     fn hash_leaf(&self, data: Vec<u8>) -> Vec<u8> {
         let mut buf: Vec<u8> = Vec::new();
         buf.push(MHT_LEAF_PREFIX);
@@ -157,7 +156,6 @@ mod tests {
     use crate::merkle_hash_tree::mem_store::MemStore;
     use crate::merkle_hash_tree::test_data;
     use std::convert::TryFrom;
-
     #[test]
     fn test_append() {
         let mut mht: MerkleHashTree<MemStore> = MerkleHashTree::new(Storer::new());
@@ -237,6 +235,9 @@ mod tests {
         }
     }
     fn mpath(m: isize, d: Vec<Vec<u8>>) -> Option<Vec<Vec<u8>>> {
+        /*
+            note this is also a reference to test against
+        */
         let n: isize = isize::try_from(d.len()).unwrap();
         if 0 > m || m >= n {
             return None;
