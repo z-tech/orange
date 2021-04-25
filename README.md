@@ -2,9 +2,9 @@
 
 A modular Merkle tree with respect to RFC6963 written for an applied cryptography graduate course.
 
-Special thanks to, @codenotary, [one of whose implementations](https://github.com/codenotary/merkletree) this project is (heavily) based on.
+Special thanks to @codenotary, [one of whose implementations](https://github.com/codenotary/merkletree) this project is (heavily) based on.
 
-Run tests:
+Test suite:
 ```
 cargo test
 ```
