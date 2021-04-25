@@ -29,3 +29,6 @@ let is_verified: bool = MerkleHashTree::<MemStore>::verify_inclusion(
 ); // verify proof
 ```
 
+Presentation:
+
+https://drive.google.com/file/d/1yjDKRPpNK2sm55G1D7xSonHKsqdbrMCl/view?usp=sharing
