@@ -1,3 +1,28 @@
 # orange
 
-This is an implementation of a Merkle Hash Tree written with respect to RFC6963. It is heavily (emphasis) inspired by work done by codenotary, particularly https://github.com/codenotary/merkletree
+A modular Merkle tree with respect to RFC6963 written for an applied cryptography graduate course.
+
+Special thanks to, @codenotary, [one of whose implementations](https://github.com/codenotary/merkletree) this project is (heavily) based on.
+
+Run tests:
+```
+cargo test
+```
+
+Usage:
+```
+let ms: MemStore = MemStore::new();
+let mut mht: MerkleHashTree<MemStore> = MerkleHashTree::new(ms);
+
+let v: Vec<u8> = "Hello World.".to_string().as_bytes().to_vec();
+mht.append(v.to_vec()); // commit new entry
+
+let path: Vec<Vec<u8>> = mht.inclusion_proof(0, 0).unwrap(); // get inclusion proof
+let is_verified: bool = MerkleHashTree::<MemStore>::verify_inclusion(
+    path.to_vec(),
+    mht.root(),
+    v,
+    0,
+    0
+); // verify proof
+```

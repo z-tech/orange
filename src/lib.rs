@@ -177,6 +177,7 @@ impl<T: Storer> MerkleHashTree<T> {
 use crate::test_data::{get_test_roots, get_test_paths};
 mod tests {
     use super::*;
+    use std::time::{Instant};
     use std::convert::TryFrom;
 
     #[test]
@@ -350,6 +351,39 @@ mod tests {
                     );
                     assert_eq!(is_verified, true);
                 }
+            }
+        }
+    }
+    #[test] #[ignore]
+    fn time_commit_and_verify() {
+        let mut mht: MerkleHashTree<MemStore> = MerkleHashTree::new(MemStore::new());
+        let roughly_one_billion: isize = (2 as isize).pow(30);
+        for index in 0..=roughly_one_billion {
+            let v: Vec<u8> = index.to_string().as_bytes().to_vec();
+            // time perfect trees
+            let log_base_2: f64 = (index as f64).log2();
+            if log_base_2.fract() == 0.0 {
+                // time commit
+                let n1 = Instant::now();
+                mht.append(v);
+                println!("a, {}, {:?}", log_base_2, n1.elapsed());
+                // time retrieve path
+                let n2 = Instant::now();
+                let path: Vec<Vec<u8>> = mht.inclusion_proof(index, index).unwrap();
+                println!("b, {}, {:?}", log_base_2, n2.elapsed());
+                // time verify path
+                let n3 = Instant::now();
+                let is_verified: bool = MerkleHashTree::<MemStore>::verify_inclusion(
+                    path.to_vec(),
+                    mht.root(),
+                    mht.store.get(0, index).unwrap(),
+                    index,
+                    index
+                );
+                println!("c, {}, {:?}", log_base_2, n3.elapsed());
+                assert_eq!(is_verified, true);
+            } else {
+                mht.append(v);
             }
         }
     }
