@@ -28,3 +28,6 @@ let is_verified: bool = MerkleHashTree::<MemStore>::verify_inclusion(
     0
 ); // verify proof
 ```
+
+Associated Presentation:
+https://stream.nyu.edu/media/CS-GY+6903+Applied+Crypto+Project+2+-+Merkle+TreeA+A+Transparent+Verifiable+Data+Structure+/1_phzznkad
