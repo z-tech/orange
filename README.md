@@ -17,9 +17,9 @@ let mut mht: MerkleHashTree<MemStore> = MerkleHashTree::new(ms);
 let v: Vec<u8> = "Hello World.".to_string().as_bytes().to_vec();
 mht.append(v.to_vec()); // commit new entry
 
-let path: Vec<Vec<u8>> = mht.inclusion_proof(0, 0).unwrap(); // get inclusion proof
+let proof: Vec<Vec<u8>> = mht.inclusion_proof(0, 0).unwrap(); // get inclusion proof
 let is_verified: bool = MerkleHashTree::<MemStore>::verify_inclusion(
-    path.to_vec(),
+    proof.to_vec(),
     mht.root(),
     v,
     0,
