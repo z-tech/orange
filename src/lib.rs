@@ -60,7 +60,7 @@ impl<T: Storer> MerkleHashTree<T> {
         // append the leaf
         let leaf_hash = hash_leaf(data);
         let mut width = self.store.width();
-        self.store.set(0, width, leaf_hash.to_vec());
+        self.store.set(0, width, &leaf_hash);
         width += 1;
 
         // rebuild the root
@@ -69,7 +69,7 @@ impl<T: Storer> MerkleHashTree<T> {
         while width > 1 {
             if width % 2 == 0 {
                 hash = hash_node(&self.store.get(i, width - 2).unwrap(), &hash);
-                self.store.set(i + 1, (width >> 1) - 1, hash.clone());
+                self.store.set(i + 1, (width >> 1) - 1, &hash);
             } else {
                 width += 1;
             }

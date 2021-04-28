@@ -29,7 +29,7 @@ impl Storer for MemStore {
         */
         isize::try_from(self.data[0].len()).unwrap()
     }
-    fn set(&mut self, layer: isize, index: isize, value: Vec<u8>) {
+    fn set(&mut self, layer: isize, index: isize, value: &[u8]) {
         /*
             as n items in tree grows, need log(n) layers
         */
@@ -40,9 +40,9 @@ impl Storer for MemStore {
             each of those layers has either a list of values (layer 0) or a list of internal hashes
         */
         if self.data[layer as usize].len() == index as usize {
-            self.data[layer as usize].push(value);
+            self.data[layer as usize].push(value.to_vec());
         } else {
-            self.data[layer as usize][index as usize] = value;
+            self.data[layer as usize][index as usize] = value.to_vec();
         }
     }
     fn get(&self, layer: isize, index: isize) -> Option<Vec<u8>> {
@@ -79,44 +79,44 @@ mod tests {
     fn tree_width_is_correct() {
         let mut mem_store: MemStore = MemStore::new();
         let value: Vec<u8> = vec![104, 101, 108, 108, 109];
-        mem_store.set(0, 0, value.to_vec());
+        mem_store.set(0, 0, &value);
         assert_eq!(mem_store.width(), 1);
-        mem_store.set(0, 1, value.to_vec());
+        mem_store.set(0, 1, &value);
         assert_eq!(mem_store.width(), 2);
-        mem_store.set(0, 1, value.to_vec()); // update. no change in width
+        mem_store.set(0, 1, &value); // update. no change in width
         assert_eq!(mem_store.width(), 2);
     }
     #[test]
     fn get_and_retrieve_from_non_zeroeth_layer() {
         let mut mem_store: MemStore = MemStore::new();
         let value: Vec<u8> = vec![104, 101, 108, 108, 109];
-        mem_store.set(1, 0, value.to_vec());
+        mem_store.set(1, 0, &value);
         assert_eq!(mem_store.get(1, 0).unwrap().to_vec(), value);
     }
     #[test]
     fn get_from_non_existent_layer_index() {
         let mut mem_store: MemStore = MemStore::new();
         let value: Vec<u8> = vec![104, 101, 108, 108, 109];
-        mem_store.set(1, 0, value.to_vec());
+        mem_store.set(1, 0, &value);
         assert_eq!(mem_store.get(1, 1).is_none(), true);
     }
     #[test]
     fn print_tree() {
         let mut mem_store: MemStore = MemStore::new();
         let mut value: Vec<u8> = vec![6];
-        mem_store.set(0, 0, value.to_vec());
+        mem_store.set(0, 0, &value);
         value[0] = 5;
-        mem_store.set(0, 1, value.to_vec());
+        mem_store.set(0, 1, &value);
         value[0] = 4;
-        mem_store.set(0, 2, value.to_vec());
+        mem_store.set(0, 2, &value);
         value[0] = 3;
-        mem_store.set(0, 3, value.to_vec());
+        mem_store.set(0, 3, &value);
         value[0] = 2;
-        mem_store.set(1, 0, value.to_vec());
+        mem_store.set(1, 0, &value);
         value[0] = 1;
-        mem_store.set(1, 1, value.to_vec());
+        mem_store.set(1, 1, &value);
         value[0] = 0;
-        mem_store.set(2, 0, value.to_vec());
+        mem_store.set(2, 0, &value);
         mem_store.print();
     }
 }
