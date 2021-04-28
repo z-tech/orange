@@ -126,9 +126,9 @@ impl<T: Storer> MerkleHashTree<T> {
         }
     }
     pub fn verify_inclusion(
-        path: Vec<Vec<u8>>,
-        root: Vec<u8>,
-        leaf: Vec<u8>,
+        path: &[Vec<u8>],
+        root: &[u8],
+        leaf: &[u8],
         mut at: isize,
         mut i: isize,
     ) -> bool {
@@ -136,16 +136,15 @@ impl<T: Storer> MerkleHashTree<T> {
             return false;
         }
 
-        let mut h: Vec<u8> = leaf;
+        let mut h = leaf.to_vec();
         for p in path.iter() {
-            let mut c: Vec<u8> = Vec::new();
-            c.push(MHT_NODE_PREFIX);
+            let mut c = vec![MHT_NODE_PREFIX];
             if i % 2 == 0 && i != at {
-                c.extend(h.iter().cloned());
+                c.extend(h);
                 c.extend(p);
             } else {
                 c.extend(p);
-                c.extend(h.iter().cloned());
+                c.extend(h);
             }
             h = digest(Algorithm::SHA256, &c);
             i /= 2;
@@ -315,19 +314,19 @@ mod tests {
         let mut path: Vec<Vec<u8>> = Vec::new();
         assert_eq!(
             true,
-            MerkleHashTree::<MemStore>::verify_inclusion(path.to_vec(), vec![], vec![], 0, 0)
+            MerkleHashTree::<MemStore>::verify_inclusion(&path, &Vec::new(), &Vec::new(), 0, 0)
         );
         assert_eq!(
             false,
-            MerkleHashTree::<MemStore>::verify_inclusion(path.to_vec(), vec![], vec![], 0, 1)
+            MerkleHashTree::<MemStore>::verify_inclusion(&path, &Vec::new(), &Vec::new(), 0, 1)
         );
         assert_eq!(
             false,
-            MerkleHashTree::<MemStore>::verify_inclusion(path.to_vec(), vec![], vec![], 1, 0)
+            MerkleHashTree::<MemStore>::verify_inclusion(&path, &Vec::new(), &Vec::new(), 1, 0)
         );
         assert_eq!(
             false,
-            MerkleHashTree::<MemStore>::verify_inclusion(path.to_vec(), vec![], vec![], 1, 1)
+            MerkleHashTree::<MemStore>::verify_inclusion(&path, &Vec::new(), &Vec::new(), 1, 1)
         );
 
         let mut mht: MerkleHashTree<MemStore> = MerkleHashTree::new(MemStore::new());
@@ -340,9 +339,9 @@ mod tests {
                 for i in 0..=at {
                     path = mpath(i, d[0..(at + 1) as usize].to_vec()).unwrap();
                     let is_verified: bool = MerkleHashTree::<MemStore>::verify_inclusion(
-                        path.to_vec(),
-                        get_test_roots()[at as usize].to_vec(),
-                        mht.store.get(0, i).unwrap(),
+                        &path,
+                        &get_test_roots()[at as usize],
+                        &mht.store.get(0, i).unwrap(),
                         at,
                         i,
                     );
@@ -372,9 +371,9 @@ mod tests {
                 // time verify path
                 let n3 = Instant::now();
                 let is_verified: bool = MerkleHashTree::<MemStore>::verify_inclusion(
-                    path.to_vec(),
-                    mht.root(),
-                    mht.store.get(0, index).unwrap(),
+                    &path,
+                    &mht.root(),
+                    &mht.store.get(0, index).unwrap(),
                     index,
                     index,
                 );
