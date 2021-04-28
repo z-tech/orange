@@ -4,6 +4,9 @@ use crypto_hash::{digest, Algorithm};
 
 use store::Storer;
 
+const MHT_LEAF_PREFIX: u8 = 0;
+const MHT_NODE_PREFIX: u8 = 1;
+
 pub struct MerkleHashTree<T: Storer> {
     pub store: T,
 }
@@ -18,8 +21,6 @@ fn min_num_bits(x: isize) -> isize {
 }
 
 impl<T: Storer> MerkleHashTree<T> {
-    const MHT_LEAF_PREFIX: u8 = 0;
-    const MHT_NODE_PREFIX: u8 = 1;
     pub fn new(s: T) -> MerkleHashTree<T> {
         MerkleHashTree { store: s }
     }
@@ -44,7 +45,7 @@ impl<T: Storer> MerkleHashTree<T> {
     }
     pub fn hash_leaf(&self, data: Vec<u8>) -> Vec<u8> {
         let mut buf: Vec<u8> = Vec::new();
-        buf.push(MerkleHashTree::<T>::MHT_LEAF_PREFIX);
+        buf.push(MHT_LEAF_PREFIX);
         buf.extend(data.iter().cloned());
         digest(Algorithm::SHA256, &buf)
     }
@@ -63,7 +64,7 @@ impl<T: Storer> MerkleHashTree<T> {
         let mut t: Vec<u8> = Vec::new();
         while width > 1 {
             if width % 2 == 0 {
-                t.resize(1, MerkleHashTree::<T>::MHT_NODE_PREFIX);
+                t.resize(1, MHT_NODE_PREFIX);
                 t.extend(self.store.get(i, width - 2).unwrap());
                 t.extend(c.to_vec());
                 c.clear();
@@ -99,7 +100,7 @@ impl<T: Storer> MerkleHashTree<T> {
 
         let half_width: isize = width / 2;
         let mut c: Vec<u8> = Vec::new();
-        c.push(MerkleHashTree::<T>::MHT_NODE_PREFIX);
+        c.push(MHT_NODE_PREFIX);
         c.extend(self.hash_at(l, l + half_width - 1, at).iter().cloned());
         c.extend(self.hash_at(l + half_width, r, at).iter().cloned());
         digest(Algorithm::SHA256, &c)
@@ -155,7 +156,7 @@ impl<T: Storer> MerkleHashTree<T> {
         let mut h: Vec<u8> = leaf;
         for p in path.iter() {
             let mut c: Vec<u8> = Vec::new();
-            c.push(MerkleHashTree::<T>::MHT_NODE_PREFIX);
+            c.push(MHT_NODE_PREFIX);
             if i % 2 == 0 && i != at {
                 c.extend(h.iter().cloned());
                 c.extend(p);
@@ -237,14 +238,14 @@ mod tests {
         }
         if n == 1 {
             let mut c: Vec<u8> = Vec::new();
-            c.push(MerkleHashTree::<MemStore>::MHT_LEAF_PREFIX);
+            c.push(MHT_LEAF_PREFIX);
             c.extend(d[0].to_vec());
             return digest(Algorithm::SHA256, &c);
         }
 
         let k: usize = 1 << (min_num_bits(n - 1) - 1);
         let mut c: Vec<u8> = Vec::new();
-        c.push(MerkleHashTree::<MemStore>::MHT_NODE_PREFIX);
+        c.push(MHT_NODE_PREFIX);
         c.extend(mth(d[0..k].to_vec()));
         c.extend(mth(d[k..(n as usize)].to_vec()));
         digest(Algorithm::SHA256, &c)
