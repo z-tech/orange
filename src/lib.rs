@@ -76,7 +76,7 @@ impl<T: Storer> MerkleHashTree<T> {
         /*
             when a left subtree becomes perfect 2^i, it becomes "frozen"
         */
-        let a: isize = 1 << layer; // 6 -> 64, 7 -> 128 etc
+        let a = 1 << layer; // 6 -> 64, 7 -> 128 etc
         at >= index * a + a - 1
     }
     fn hash_at(&self, l: isize, r: isize, at: isize) -> Vec<u8> {
