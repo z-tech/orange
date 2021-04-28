@@ -8,19 +8,20 @@ pub struct MerkleHashTree<T: Storer> {
     pub store: T,
 }
 
+fn min_num_bits(x: isize) -> isize {
+    /*
+        there's an isize::BITS function that does this, but it is only a "nightly" build,
+        so just working around that for now
+    */
+    const ISIZE_BITS: u32 = std::mem::size_of::<isize>() as u32 * 8;
+    (ISIZE_BITS - x.leading_zeros()) as isize
+}
+
 impl<T: Storer> MerkleHashTree<T> {
     const MHT_LEAF_PREFIX: u8 = 0;
     const MHT_NODE_PREFIX: u8 = 1;
     pub fn new(s: T) -> MerkleHashTree<T> {
         MerkleHashTree { store: s }
-    }
-    fn min_num_bits(x: isize) -> isize {
-        /*
-            there's an isize::BITS function that does this, but it is only a "nightly" build,
-            so just working around that for now with count_ones() and count_zeros()
-        */
-        let total_bits: u32 = x.count_ones() + x.count_zeros();
-        (total_bits - x.leading_zeros()) as isize
     }
     pub fn depth(&self) -> isize {
         /*
@@ -33,7 +34,7 @@ impl<T: Storer> MerkleHashTree<T> {
         /*
             note that width is num leaves in tree, min_num_bits(width) is essentially log2 operation
         */
-        MerkleHashTree::<T>::min_num_bits(width - 1)
+        min_num_bits(width - 1)
     }
     pub fn root(&self) -> Vec<u8> {
         /*
@@ -93,7 +94,7 @@ impl<T: Storer> MerkleHashTree<T> {
             return self.store.get(0, r).unwrap();
         }
 
-        let layer: isize = MerkleHashTree::<T>::min_num_bits(r - l); // height of subtree
+        let layer: isize = min_num_bits(r - l); // height of subtree
         let width: isize = 1 << layer; // width of subtree
 
         if at >= l + width - 1 || at == self.store.width() - 1 {
@@ -124,7 +125,7 @@ impl<T: Storer> MerkleHashTree<T> {
         let mut right: isize;
         let mut result: Vec<Vec<u8>> = Vec::new();
         loop {
-            let d: isize = MerkleHashTree::<T>::min_num_bits(at1 - 1);
+            let d: isize = min_num_bits(at1 - 1);
             let k: isize = 1 << (d - 1);
             if i1 < k {
                 left = offset + k;
@@ -245,7 +246,7 @@ mod tests {
             return digest(Algorithm::SHA256, &c);
         }
 
-        let k: usize = 1 << (MerkleHashTree::<MemStore>::min_num_bits(n - 1) - 1);
+        let k: usize = 1 << (min_num_bits(n - 1) - 1);
         let mut c: Vec<u8> = Vec::new();
         c.push(MerkleHashTree::<MemStore>::MHT_NODE_PREFIX);
         c.extend(mth(d[0..k].to_vec()));
@@ -274,7 +275,7 @@ mod tests {
             return Some(vec![]);
         }
 
-        let k: isize = 1 << (MerkleHashTree::<MemStore>::min_num_bits(n - 1) - 1);
+        let k: isize = 1 << (min_num_bits(n - 1) - 1);
         let mut path: Vec<Vec<u8>> = Vec::new();
         let sub_path_option: Option<Vec<Vec<u8>>>;
         if m < k {
