@@ -26,6 +26,13 @@ fn hash_leaf(data: &[u8]) -> Vec<u8> {
     digest(Algorithm::SHA256, &buf)
 }
 
+fn hash_node(left: &[u8], right: &[u8]) -> Vec<u8> {
+    let mut buf = vec![MHT_NODE_PREFIX];
+    buf.extend(left);
+    buf.extend(right);
+    digest(Algorithm::SHA256, &buf)
+}
+
 impl<T: Storer> MerkleHashTree<T> {
     pub fn new(s: T) -> MerkleHashTree<T> {
         MerkleHashTree { store: s }
@@ -61,10 +68,7 @@ impl<T: Storer> MerkleHashTree<T> {
         let mut hash = leaf_hash;
         while width > 1 {
             if width % 2 == 0 {
-                let mut t = vec![MHT_NODE_PREFIX];
-                t.extend(self.store.get(i, width - 2).unwrap());
-                t.extend(&hash);
-                hash = digest(Algorithm::SHA256, &t);
+                hash = hash_node(&self.store.get(i, width - 2).unwrap(), &hash);
                 self.store.set(i + 1, (width >> 1) - 1, hash.clone());
             } else {
                 width += 1;
@@ -93,10 +97,10 @@ impl<T: Storer> MerkleHashTree<T> {
         }
 
         let mid_point = width / 2;
-        let mut c = vec![MHT_NODE_PREFIX];
-        c.extend(self.hash_at(l, l + mid_point - 1, at));
-        c.extend(self.hash_at(l + mid_point, r, at));
-        digest(Algorithm::SHA256, &c)
+        hash_node(
+            &self.hash_at(l, l + mid_point - 1, at),
+            &self.hash_at(l + mid_point, r, at),
+        )
     }
     pub fn inclusion_proof(&self, at: isize, i: isize) -> Option<Vec<Vec<u8>>> {
         if at == 0 && i == 0 {
@@ -139,15 +143,11 @@ impl<T: Storer> MerkleHashTree<T> {
 
         let mut h = leaf.to_vec();
         for p in path.iter() {
-            let mut c = vec![MHT_NODE_PREFIX];
             if i % 2 == 0 && i != at {
-                c.extend(h);
-                c.extend(p);
+                h = hash_node(&h, p);
             } else {
-                c.extend(p);
-                c.extend(h);
+                h = hash_node(p, &h);
             }
-            h = digest(Algorithm::SHA256, &c);
             i /= 2;
             at /= 2;
         }
@@ -210,7 +210,7 @@ mod tests {
         assert_eq!(MerkleHashTree::<MemStore>::is_frozen(0, 6, 6), true);
         assert_eq!(MerkleHashTree::<MemStore>::is_frozen(0, 7, 6), false);
     }
-    fn mth(d: Vec<Vec<u8>>) -> Vec<u8> {
+    fn mth(d: &[Vec<u8>]) -> Vec<u8> {
         /*
             note this is to test against the reference implementation as per
                 https://tools.ietf.org/html/rfc6962#section-2.1
@@ -224,23 +224,19 @@ mod tests {
         }
 
         let k: usize = 1 << (min_num_bits(n - 1) - 1);
-        let mut c: Vec<u8> = Vec::new();
-        c.push(MHT_NODE_PREFIX);
-        c.extend(mth(d[0..k].to_vec()));
-        c.extend(mth(d[k..(n as usize)].to_vec()));
-        digest(Algorithm::SHA256, &c)
+        hash_node(&mth(&d[0..k]), &mth(&d[k..(n as usize)]))
     }
     #[test]
     fn test_mth() {
         let mut d: Vec<Vec<u8>> = Vec::new();
-        assert_eq!(digest(Algorithm::SHA256, b""), mth(d.to_vec()));
+        assert_eq!(digest(Algorithm::SHA256, b""), mth(&d));
         for index in 0..=64 {
             let b: Vec<u8> = index.to_string().as_bytes().to_vec();
             d.push(b);
-            assert_eq!(get_test_roots()[index as usize], mth(d.to_vec()));
+            assert_eq!(get_test_roots()[index as usize], mth(&d));
         }
     }
-    fn mpath(m: isize, d: Vec<Vec<u8>>) -> Option<Vec<Vec<u8>>> {
+    fn mpath(m: isize, d: &[Vec<u8>]) -> Option<Vec<Vec<u8>>> {
         /*
             note this is also a reference to test against
         */
@@ -256,30 +252,30 @@ mod tests {
         let mut path: Vec<Vec<u8>> = Vec::new();
         let sub_path_option: Option<Vec<Vec<u8>>>;
         if m < k {
-            sub_path_option = mpath(m, d[0..k as usize].to_vec());
+            sub_path_option = mpath(m, &d[0..k as usize]);
             if sub_path_option != None {
                 path.extend(sub_path_option.unwrap());
             }
-            path.push(mth(d[k as usize..n as usize].to_vec()));
+            path.push(mth(&d[k as usize..n as usize]));
         } else {
-            sub_path_option = mpath(m - k, d[k as usize..n as usize].to_vec());
+            sub_path_option = mpath(m - k, &d[k as usize..n as usize]);
             if sub_path_option != None {
                 path.extend(sub_path_option.unwrap());
             }
-            path.push(mth(d[0..k as usize].to_vec()));
+            path.push(mth(&d[0..k as usize]));
         }
         Some(path)
     }
     #[test]
     fn test_mpath() {
         let mut d: Vec<Vec<u8>> = Vec::new();
-        assert_eq!(None, mpath(0, d.to_vec()));
+        assert_eq!(None, mpath(0, &d));
         for index in 0..=8 {
             let b: Vec<u8> = index.to_string().as_bytes().to_vec();
             d.push(b);
-            assert_eq!(None, mpath(index + 1, d.to_vec())); // undefined path
+            assert_eq!(None, mpath(index + 1, &d)); // undefined path
             for i in 0..=index {
-                let path: Vec<Vec<u8>> = mpath(i, d.to_vec()).unwrap();
+                let path: Vec<Vec<u8>> = mpath(i, &d).unwrap();
                 assert_eq!(get_test_paths()[index as usize][i as usize], path);
             }
         }
@@ -300,8 +296,7 @@ mod tests {
             for at in 0..=index {
                 for i in 0..=at {
                     let path_option: Option<Vec<Vec<u8>>> = mht.inclusion_proof(at, i);
-                    let expected_option: Option<Vec<Vec<u8>>> =
-                        mpath(i, d[0..(at + 1) as usize].to_vec());
+                    let expected_option: Option<Vec<Vec<u8>>> = mpath(i, &d[0..(at + 1) as usize]);
                     assert_eq!(path_option, expected_option);
                 }
             }
@@ -335,7 +330,7 @@ mod tests {
             mht.append(&v);
             for at in 0..=index {
                 for i in 0..=at {
-                    path = mpath(i, d[0..(at + 1) as usize].to_vec()).unwrap();
+                    path = mpath(i, &d[0..(at + 1) as usize]).unwrap();
                     let is_verified: bool = MerkleHashTree::<MemStore>::verify_inclusion(
                         &path,
                         &get_test_roots()[at as usize],
