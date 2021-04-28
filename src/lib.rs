@@ -1,9 +1,8 @@
 mod store;
-mod test_data;
 
 use crypto_hash::{digest, Algorithm};
 
-use crate::store::Storer;
+use store::Storer;
 
 pub struct MerkleHashTree<T: Storer> {
     pub store: T,
@@ -177,13 +176,13 @@ impl<T: Storer> MerkleHashTree<T> {
 }
 
 #[cfg(test)]
-use crate::test_data::{get_test_paths, get_test_roots};
-#[cfg(test)]
 mod tests {
+    mod test_data;
     use super::*;
     use crate::store::mem_store::MemStore;
     use std::convert::TryFrom;
     use std::time::Instant;
+    use test_data::{get_test_paths, get_test_roots};
 
     #[test]
     fn test_append() {
