@@ -43,14 +43,13 @@ impl<T: Storer> MerkleHashTree<T> {
             n => self.store.get(n, 0).unwrap(),
         }
     }
-    pub fn hash_leaf(&self, data: Vec<u8>) -> Vec<u8> {
-        let mut buf: Vec<u8> = Vec::new();
-        buf.push(MHT_LEAF_PREFIX);
-        buf.extend(data.iter().cloned());
+    pub fn hash_leaf(&self, data: &[u8]) -> Vec<u8> {
+        let mut buf = vec![MHT_LEAF_PREFIX];
+        buf.extend(data);
         digest(Algorithm::SHA256, &buf)
     }
     pub fn append(&mut self, data: Vec<u8>) {
-        self.append_hash(self.hash_leaf(data));
+        self.append_hash(self.hash_leaf(&data));
     }
     fn append_hash(&mut self, leaf_hash: Vec<u8>) {
         // append the leaf
@@ -203,7 +202,8 @@ mod tests {
         assert_eq!(digest(Algorithm::SHA256, b""), mht.root());
         let value: Vec<u8> = "my value".as_bytes().to_vec();
         mht.append(value.to_vec());
-        assert_eq!(mht.hash_leaf(value), mht.root());
+        assert_eq!(mht.hash_leaf(&value), mht.root());
+        assert_eq!(value.len(), 8);
     }
     #[test]
     fn test_is_frozen() {
