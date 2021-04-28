@@ -1,194 +1,179 @@
 mod store;
-mod test_data;
 
-use crypto_hash::{Algorithm, digest};
+use crypto_hash::{digest, Algorithm};
 
-use crate::store::Storer;
-use crate::store::mem_store::MemStore;
+use store::Storer;
 
-struct MerkleHashTree<T: Storer> {
+const MHT_LEAF_PREFIX: u8 = 0;
+const MHT_NODE_PREFIX: u8 = 1;
+
+pub struct MerkleHashTree<T: Storer> {
     pub store: T,
 }
 
+fn min_num_bits(x: isize) -> isize {
+    /*
+        there's an isize::BITS function that does this, but it is only a "nightly" build,
+        so just working around that for now
+    */
+    const ISIZE_BITS: u32 = std::mem::size_of::<isize>() as u32 * 8;
+    (ISIZE_BITS - x.leading_zeros()) as isize
+}
+
+fn hash_leaf(data: &[u8]) -> Vec<u8> {
+    let mut buf = vec![MHT_LEAF_PREFIX];
+    buf.extend(data);
+    digest(Algorithm::SHA256, &buf)
+}
+
+fn hash_node(left: &[u8], right: &[u8]) -> Vec<u8> {
+    let mut buf = vec![MHT_NODE_PREFIX];
+    buf.extend(left);
+    buf.extend(right);
+    digest(Algorithm::SHA256, &buf)
+}
+
 impl<T: Storer> MerkleHashTree<T> {
-    const MHT_LEAF_PREFIX: u8 = 0;
-    const MHT_NODE_PREFIX: u8 = 1;
-    fn new(s: T) -> MerkleHashTree<T> {
-        return MerkleHashTree {
-            store: s,
-        };
+    pub fn new(s: T) -> MerkleHashTree<T> {
+        MerkleHashTree { store: s }
     }
-    fn min_num_bits(x: isize) -> isize {
-        /*
-            there's an isize::BITS function that does this, but it is only a "nightly" build,
-            so just working around that for now with count_ones() and count_zeros()
-        */
-        let total_bits: u32 = x.count_ones() + x.count_zeros();
-        return (total_bits - x.leading_zeros()) as isize;
-    }
-    fn depth(&self) -> isize {
+    pub fn depth(&self) -> isize {
         /*
             canonically, a tree of size zero has depth of negative one
         */
-        let width: isize = self.store.width();
-        if width == 0 {
-            return -1;
+        match self.store.width() {
+            0 => -1,
+            // note that width is num leaves in tree, min_num_bits(width) is essentially log2 operation
+            n => min_num_bits(n - 1),
         }
-        /*
-            note that width is num leaves in tree, min_num_bits(width) is essentially log2 operation
-        */
-        return MerkleHashTree::<T>::min_num_bits(width - 1);
     }
-    fn root(&self) -> Vec<u8> {
+    pub fn root(&self) -> Vec<u8> {
         /*
             per RFC the root hash of an empty tree is hash of empty string
         */
-        let depth: isize = self.depth();
-        if depth == -1 {
-            return digest(Algorithm::SHA256, b"");
+        match self.depth() {
+            -1 => digest(Algorithm::SHA256, b""),
+            n => self.store.get(n, 0).unwrap(),
         }
-        return self.store.get(depth, 0).unwrap();
     }
-    fn hash_leaf(&self, data: Vec<u8>) -> Vec<u8> {
-        let mut buf: Vec<u8> = Vec::new();
-        buf.push(MerkleHashTree::<T>::MHT_LEAF_PREFIX);
-        buf.extend(data.iter().cloned());
-        return digest(Algorithm::SHA256, &buf);
-    }
-    fn append(&mut self, data: Vec<u8>) {
-        self.append_hash(self.hash_leaf(data));
-    }
-    fn append_hash(&mut self, leaf_hash: Vec<u8>) {
+    pub fn append(&mut self, data: &[u8]) {
         // append the leaf
-        let mut width: isize = self.store.width();
-        self.store.set(0, width, leaf_hash.to_vec());
+        let leaf_hash = hash_leaf(data);
+        let mut width = self.store.width();
+        self.store.set(0, width, &leaf_hash);
         width += 1;
 
         // rebuild the root
-        let mut i: isize = 0;
-        let mut c: Vec<u8> = leaf_hash.to_vec();
-        let mut t: Vec<u8> = Vec::new();
+        let mut i = 0;
+        let mut hash = leaf_hash;
         while width > 1 {
             if width % 2 == 0 {
-                t.resize(1, MerkleHashTree::<T>::MHT_NODE_PREFIX);
-                t.extend(self.store.get(i, width-2).unwrap());
-                t.extend(c.to_vec());
-                c.resize(0, 0);
-                c.extend(digest(Algorithm::SHA256, &t));
-                i += 1;
-                width >>= 1;
-                self.store.set(i, width-1, c.to_vec());
+                hash = hash_node(&self.store.get(i, width - 2).unwrap(), &hash);
+                self.store.set(i + 1, (width >> 1) - 1, &hash);
             } else {
                 width += 1;
-                i += 1;
-                width >>= 1;
             }
+            i += 1;
+            width >>= 1;
         }
     }
-    fn is_frozen(layer: isize, index: isize, at: isize) -> bool {
+    pub fn is_frozen(layer: isize, index: isize, at: isize) -> bool {
         /*
             when a left subtree becomes perfect 2^i, it becomes "frozen"
         */
-        let a: isize = 1 << layer; // 6 -> 64, 7 -> 128 etc
-        return at >= index * a + a - 1;
+        let a = 1 << layer; // 6 -> 64, 7 -> 128 etc
+        at >= index * a + a - 1
     }
     fn hash_at(&self, l: isize, r: isize, at: isize) -> Vec<u8> {
         if r == l {
             return self.store.get(0, r).unwrap();
         }
 
-        let layer: isize = MerkleHashTree::<T>::min_num_bits(r-l); // height of subtree
-        let a: isize = 1 << layer; // width of subtree
+        let layer = min_num_bits(r - l); // height of subtree
+        let width = 1 << layer; // width of subtree
 
-        if at >= l+a-1 || at == self.store.width()-1 {
-            return self.store.get(layer, l/a).unwrap();
+        if at >= l + width - 1 || at == self.store.width() - 1 {
+            return self.store.get(layer, l / width).unwrap();
         }
 
-        let k: isize = a / 2;
-        let mut c: Vec<u8> = Vec::new();
-        c.push(MerkleHashTree::<T>::MHT_NODE_PREFIX);
-        c.extend(self.hash_at(l, l+k-1, at).iter().cloned());
-        c.extend(self.hash_at(l+k, r, at).iter().cloned());
-        return digest(Algorithm::SHA256, &c);
+        let mid_point = width / 2;
+        hash_node(
+            &self.hash_at(l, l + mid_point - 1, at),
+            &self.hash_at(l + mid_point, r, at),
+        )
     }
-    fn inclusion_proof(&self, at: isize, i: isize) -> Option<Vec<Vec<u8>>> {
-        let w: isize = self.store.width();
+    pub fn inclusion_proof(&self, at: isize, i: isize) -> Option<Vec<Vec<u8>>> {
         if at == 0 && i == 0 {
             return Some(vec![]);
         }
-        if i > at || at >= w || at < 1 {
+        if i > at || at >= self.store.width() || at < 1 {
             return None;
         }
 
-        let mut m: isize = i;
-        let mut n: isize = at + 1;
-
-        let mut offset: isize = 0;
-        let mut l: isize;
-        let mut r: isize;
-        let mut p: Vec<Vec<u8>> = Vec::new();
+        let mut i1 = i;
+        let mut at1 = at + 1;
+        let mut offset = 0;
+        let mut result: Vec<Vec<u8>> = Vec::new();
         loop {
-            let d: isize = MerkleHashTree::<T>::min_num_bits(n - 1);
-            let k: isize = 1 << (d - 1);
-            if m < k {
-                l = offset + k;
-                r = offset + n - 1;
-                n = k;
+            let k: isize = 1 << (min_num_bits(at1 - 1) - 1);
+            if i1 < k {
+                result.insert(0, self.hash_at(offset + k, offset + at1 - 1, at));
+                at1 = k;
             } else {
-                l = offset;
-                r = offset + k - 1;
-                m = m - k;
-                n = n - k;
+                result.insert(0, self.hash_at(offset, offset + k - 1, at));
+                i1 -= k;
+                at1 -= k;
                 offset += k;
             }
-
-            p.insert(0, self.hash_at(l, r, at));
-            if n < 1 || (n == 1 && m == 0) {
-                return Some(p);
+            if at1 < 1 || (at1 == 1 && i1 == 0) {
+                return Some(result);
             }
         }
     }
-    fn verify_inclusion(path: Vec<Vec<u8>>, root: Vec<u8>, leaf: Vec<u8>, mut at: isize, mut i: isize, ) -> bool {
-        if i > at || (at > 0 && path.len() == 0) {
+    pub fn verify_inclusion(
+        path: &[Vec<u8>],
+        root: &[u8],
+        leaf: &[u8],
+        mut at: isize,
+        mut i: isize,
+    ) -> bool {
+        if i > at || (at > 0 && path.is_empty()) {
             return false;
         }
 
-        let mut h: Vec<u8> = leaf;
+        let mut h = leaf.to_vec();
         for p in path.iter() {
-            let mut c: Vec<u8> = Vec::new();
-            c.push(MerkleHashTree::<T>::MHT_NODE_PREFIX);
             if i % 2 == 0 && i != at {
-                c.extend(h.iter().cloned());
-                c.extend(p);
+                h = hash_node(&h, p);
             } else {
-                c.extend(p);
-                c.extend(h.iter().cloned());
+                h = hash_node(p, &h);
             }
-            h = digest(Algorithm::SHA256, &c);
             i /= 2;
             at /= 2;
         }
 
-        return at == i && h == root;
+        at == i && h == root
     }
 }
 
 #[cfg(test)]
-use crate::test_data::{get_test_roots, get_test_paths};
 mod tests {
+    mod test_data;
     use super::*;
-    use std::time::{Instant};
+    use crate::store::mem_store::MemStore;
     use std::convert::TryFrom;
+    use std::time::Instant;
+    use test_data::{get_test_paths, get_test_roots};
 
     #[test]
     fn test_append() {
         let mut mht: MerkleHashTree<MemStore> = MerkleHashTree::new(MemStore::new());
         assert_eq!(-1, mht.depth());
         for index in 0..64 {
-            let b: Vec<u8> = index.to_string().as_bytes().to_vec();
-            mht.append(b);
+            let b = index.to_string().as_bytes().to_vec();
+            mht.append(&b);
 
-            assert_eq!(index as isize, mht.store.width()-1);
+            assert_eq!(index as isize, mht.store.width() - 1);
             let d: f64 = ((index + 1) as f64).log2().ceil();
             assert_eq!(d as isize, mht.depth());
 
@@ -199,9 +184,9 @@ mod tests {
     fn test_root() {
         let mut mht: MerkleHashTree<MemStore> = MerkleHashTree::new(MemStore::new());
         assert_eq!(digest(Algorithm::SHA256, b""), mht.root());
-        let value: Vec<u8> = "my value".as_bytes().to_vec();
-        mht.append(value.to_vec());
-        assert_eq!(mht.hash_leaf(value), mht.root());
+        let value = "my value".as_bytes().to_vec();
+        mht.append(&value);
+        assert_eq!(hash_leaf(&value), mht.root());
     }
     #[test]
     fn test_is_frozen() {
@@ -225,7 +210,7 @@ mod tests {
         assert_eq!(MerkleHashTree::<MemStore>::is_frozen(0, 6, 6), true);
         assert_eq!(MerkleHashTree::<MemStore>::is_frozen(0, 7, 6), false);
     }
-    fn mth(d: Vec<Vec<u8>>) -> Vec<u8> {
+    fn mth(d: &[Vec<u8>]) -> Vec<u8> {
         /*
             note this is to test against the reference implementation as per
                 https://tools.ietf.org/html/rfc6962#section-2.1
@@ -235,30 +220,23 @@ mod tests {
             return digest(Algorithm::SHA256, b"");
         }
         if n == 1 {
-            let mut c: Vec<u8> = Vec::new();
-            c.push(MerkleHashTree::<MemStore>::MHT_LEAF_PREFIX);
-            c.extend(d[0].to_vec());
-            return digest(Algorithm::SHA256, &c);
+            return hash_leaf(&d[0]);
         }
 
-        let k: usize = 1 << (MerkleHashTree::<MemStore>::min_num_bits(n - 1) - 1);
-        let mut c: Vec<u8> = Vec::new();
-        c.push(MerkleHashTree::<MemStore>::MHT_NODE_PREFIX);
-        c.extend(mth(d[0..k].to_vec()));
-        c.extend(mth(d[k..(n as usize)].to_vec()));
-        return digest(Algorithm::SHA256, &c);
+        let k: usize = 1 << (min_num_bits(n - 1) - 1);
+        hash_node(&mth(&d[0..k]), &mth(&d[k..(n as usize)]))
     }
     #[test]
     fn test_mth() {
         let mut d: Vec<Vec<u8>> = Vec::new();
-        assert_eq!(digest(Algorithm::SHA256, b""), mth(d.to_vec()));
+        assert_eq!(digest(Algorithm::SHA256, b""), mth(&d));
         for index in 0..=64 {
             let b: Vec<u8> = index.to_string().as_bytes().to_vec();
             d.push(b);
-            assert_eq!(get_test_roots()[index as usize], mth(d.to_vec()));
+            assert_eq!(get_test_roots()[index as usize], mth(&d));
         }
     }
-    fn mpath(m: isize, d: Vec<Vec<u8>>) -> Option<Vec<Vec<u8>>> {
+    fn mpath(m: isize, d: &[Vec<u8>]) -> Option<Vec<Vec<u8>>> {
         /*
             note this is also a reference to test against
         */
@@ -270,35 +248,34 @@ mod tests {
             return Some(vec![]);
         }
 
-
-        let k: isize = 1 << (MerkleHashTree::<MemStore>::min_num_bits(n - 1) - 1);
+        let k: isize = 1 << (min_num_bits(n - 1) - 1);
         let mut path: Vec<Vec<u8>> = Vec::new();
         let sub_path_option: Option<Vec<Vec<u8>>>;
         if m < k {
-            sub_path_option = mpath(m, d[0..k as usize].to_vec());
+            sub_path_option = mpath(m, &d[0..k as usize]);
             if sub_path_option != None {
                 path.extend(sub_path_option.unwrap());
             }
-            path.push(mth(d[k as usize .. n as usize].to_vec()));
+            path.push(mth(&d[k as usize..n as usize]));
         } else {
-            sub_path_option = mpath(m-k, d[k as usize..n as usize].to_vec());
+            sub_path_option = mpath(m - k, &d[k as usize..n as usize]);
             if sub_path_option != None {
                 path.extend(sub_path_option.unwrap());
             }
-            path.push(mth(d[0..k as usize].to_vec()));
+            path.push(mth(&d[0..k as usize]));
         }
-        return Some(path);
+        Some(path)
     }
     #[test]
     fn test_mpath() {
         let mut d: Vec<Vec<u8>> = Vec::new();
-        assert_eq!(None, mpath(0, d.to_vec()));
+        assert_eq!(None, mpath(0, &d));
         for index in 0..=8 {
             let b: Vec<u8> = index.to_string().as_bytes().to_vec();
             d.push(b);
-            assert_eq!(None, mpath(index + 1, d.to_vec())); // undefined path
+            assert_eq!(None, mpath(index + 1, &d)); // undefined path
             for i in 0..=index {
-                let path: Vec<Vec<u8>> = mpath(i, d.to_vec()).unwrap();
+                let path: Vec<Vec<u8>> = mpath(i, &d).unwrap();
                 assert_eq!(get_test_paths()[index as usize][i as usize], path);
             }
         }
@@ -310,7 +287,7 @@ mod tests {
         for index in 0..=64 {
             let v: Vec<u8> = index.to_string().as_bytes().to_vec();
             d.push(v.to_vec());
-            mht.append(v);
+            mht.append(&v);
 
             // test out of range
             assert_eq!(mht.inclusion_proof(index + 1, index), None);
@@ -319,7 +296,7 @@ mod tests {
             for at in 0..=index {
                 for i in 0..=at {
                     let path_option: Option<Vec<Vec<u8>>> = mht.inclusion_proof(at, i);
-                    let expected_option: Option<Vec<Vec<u8>>> = mpath(i, d[0..(at+1) as usize].to_vec());
+                    let expected_option: Option<Vec<Vec<u8>>> = mpath(i, &d[0..(at + 1) as usize]);
                     assert_eq!(path_option, expected_option);
                 }
             }
@@ -328,36 +305,49 @@ mod tests {
     #[test]
     fn test_verify_inclusion() {
         let mut path: Vec<Vec<u8>> = Vec::new();
-        assert_eq!(true, MerkleHashTree::<MemStore>::verify_inclusion(path.to_vec(), vec![], vec![], 0, 0));
-        assert_eq!(false, MerkleHashTree::<MemStore>::verify_inclusion(path.to_vec(), vec![], vec![], 0, 1));
-        assert_eq!(false, MerkleHashTree::<MemStore>::verify_inclusion(path.to_vec(), vec![], vec![], 1, 0));
-        assert_eq!(false, MerkleHashTree::<MemStore>::verify_inclusion(path.to_vec(), vec![], vec![], 1, 1));
+        assert_eq!(
+            true,
+            MerkleHashTree::<MemStore>::verify_inclusion(&path, &Vec::new(), &Vec::new(), 0, 0)
+        );
+        assert_eq!(
+            false,
+            MerkleHashTree::<MemStore>::verify_inclusion(&path, &Vec::new(), &Vec::new(), 0, 1)
+        );
+        assert_eq!(
+            false,
+            MerkleHashTree::<MemStore>::verify_inclusion(&path, &Vec::new(), &Vec::new(), 1, 0)
+        );
+        assert_eq!(
+            false,
+            MerkleHashTree::<MemStore>::verify_inclusion(&path, &Vec::new(), &Vec::new(), 1, 1)
+        );
 
         let mut mht: MerkleHashTree<MemStore> = MerkleHashTree::new(MemStore::new());
         let mut d: Vec<Vec<u8>> = Vec::new();
         for index in 0..=64 {
             let v: Vec<u8> = index.to_string().as_bytes().to_vec();
             d.push(v.to_vec());
-            mht.append(v);
+            mht.append(&v);
             for at in 0..=index {
                 for i in 0..=at {
-                    path = mpath(i, d[0..(at+1) as usize].to_vec()).unwrap();
+                    path = mpath(i, &d[0..(at + 1) as usize]).unwrap();
                     let is_verified: bool = MerkleHashTree::<MemStore>::verify_inclusion(
-                        path.to_vec(),
-                        get_test_roots()[at as usize].to_vec(),
-                        mht.store.get(0, i).unwrap(),
+                        &path,
+                        &get_test_roots()[at as usize],
+                        &mht.store.get(0, i).unwrap(),
                         at,
-                        i
+                        i,
                     );
                     assert_eq!(is_verified, true);
                 }
             }
         }
     }
-    #[test] #[ignore]
+    #[test]
+    #[ignore]
     fn time_commit_and_verify() {
         let mut mht: MerkleHashTree<MemStore> = MerkleHashTree::new(MemStore::new());
-        let roughly_one_billion: isize = (2 as isize).pow(30);
+        let roughly_one_billion: isize = 2isize.pow(30);
         for index in 0..=roughly_one_billion {
             let v: Vec<u8> = index.to_string().as_bytes().to_vec();
             // time perfect trees
@@ -365,7 +355,7 @@ mod tests {
             if log_base_2.fract() == 0.0 {
                 // time commit
                 let n1 = Instant::now();
-                mht.append(v);
+                mht.append(&v);
                 println!("a, {}, {:?}", log_base_2, n1.elapsed());
                 // time retrieve path
                 let n2 = Instant::now();
@@ -374,16 +364,16 @@ mod tests {
                 // time verify path
                 let n3 = Instant::now();
                 let is_verified: bool = MerkleHashTree::<MemStore>::verify_inclusion(
-                    path.to_vec(),
-                    mht.root(),
-                    mht.store.get(0, index).unwrap(),
+                    &path,
+                    &mht.root(),
+                    &mht.store.get(0, index).unwrap(),
                     index,
-                    index
+                    index,
                 );
                 println!("c, {}, {:?}", log_base_2, n3.elapsed());
                 assert_eq!(is_verified, true);
             } else {
-                mht.append(v);
+                mht.append(&v);
             }
         }
     }
