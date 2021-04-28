@@ -48,8 +48,8 @@ impl<T: Storer> MerkleHashTree<T> {
         buf.extend(data);
         digest(Algorithm::SHA256, &buf)
     }
-    pub fn append(&mut self, data: Vec<u8>) {
-        self.append_hash(self.hash_leaf(&data));
+    pub fn append(&mut self, data: &[u8]) {
+        self.append_hash(self.hash_leaf(data));
     }
     fn append_hash(&mut self, leaf_hash: Vec<u8>) {
         // append the leaf
@@ -186,8 +186,8 @@ mod tests {
         let mut mht: MerkleHashTree<MemStore> = MerkleHashTree::new(MemStore::new());
         assert_eq!(-1, mht.depth());
         for index in 0..64 {
-            let b: Vec<u8> = index.to_string().as_bytes().to_vec();
-            mht.append(b);
+            let b = index.to_string().as_bytes().to_vec();
+            mht.append(&b);
 
             assert_eq!(index as isize, mht.store.width() - 1);
             let d: f64 = ((index + 1) as f64).log2().ceil();
@@ -200,10 +200,9 @@ mod tests {
     fn test_root() {
         let mut mht: MerkleHashTree<MemStore> = MerkleHashTree::new(MemStore::new());
         assert_eq!(digest(Algorithm::SHA256, b""), mht.root());
-        let value: Vec<u8> = "my value".as_bytes().to_vec();
-        mht.append(value.to_vec());
+        let value = "my value".as_bytes().to_vec();
+        mht.append(&value);
         assert_eq!(mht.hash_leaf(&value), mht.root());
-        assert_eq!(value.len(), 8);
     }
     #[test]
     fn test_is_frozen() {
@@ -311,7 +310,7 @@ mod tests {
         for index in 0..=64 {
             let v: Vec<u8> = index.to_string().as_bytes().to_vec();
             d.push(v.to_vec());
-            mht.append(v);
+            mht.append(&v);
 
             // test out of range
             assert_eq!(mht.inclusion_proof(index + 1, index), None);
@@ -352,7 +351,7 @@ mod tests {
         for index in 0..=64 {
             let v: Vec<u8> = index.to_string().as_bytes().to_vec();
             d.push(v.to_vec());
-            mht.append(v);
+            mht.append(&v);
             for at in 0..=index {
                 for i in 0..=at {
                     path = mpath(i, d[0..(at + 1) as usize].to_vec()).unwrap();
@@ -380,7 +379,7 @@ mod tests {
             if log_base_2.fract() == 0.0 {
                 // time commit
                 let n1 = Instant::now();
-                mht.append(v);
+                mht.append(&v);
                 println!("a, {}, {:?}", log_base_2, n1.elapsed());
                 // time retrieve path
                 let n2 = Instant::now();
@@ -398,7 +397,7 @@ mod tests {
                 println!("c, {}, {:?}", log_base_2, n3.elapsed());
                 assert_eq!(is_verified, true);
             } else {
-                mht.append(v);
+                mht.append(&v);
             }
         }
     }
