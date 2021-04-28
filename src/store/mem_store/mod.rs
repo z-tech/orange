@@ -3,14 +3,12 @@ use std::convert::TryFrom;
 use crate::store::Storer;
 
 pub struct MemStore {
-    data: Vec<Vec<Vec<u8>>>
+    data: Vec<Vec<Vec<u8>>>,
 }
 
 impl Storer for MemStore {
     fn new() -> MemStore {
-        return MemStore {
-            data: vec![vec![]],
-        };
+        return MemStore { data: vec![vec![]] };
     }
     /*
         Note: width of the tree tells us how many values are in the ledger
@@ -57,8 +55,8 @@ impl Storer for MemStore {
         let mut tab: String;
         let mut i: isize = isize::try_from(self.data.len()).unwrap() - 1;
         while i >= 0 {
-            print!("{}", String::from("  ").repeat((1<<i)-1));
-            tab = String::from("  ").repeat((1<<(i+1))-1);
+            print!("{}", String::from("  ").repeat((1 << i) - 1));
+            tab = String::from("  ").repeat((1 << (i + 1)) - 1);
             for layer in self.data[i as usize].iter() {
                 print!("{:?}{}", layer[0], tab);
             }
