@@ -37,11 +37,10 @@ impl<T: Storer> MerkleHashTree<T> {
         /*
             per RFC the root hash of an empty tree is hash of empty string
         */
-        let depth: isize = self.depth();
-        if depth == -1 {
-            return digest(Algorithm::SHA256, b"");
+        match self.depth() {
+            -1 => digest(Algorithm::SHA256, b""),
+            n => self.store.get(n, 0).unwrap(),
         }
-        self.store.get(depth, 0).unwrap()
     }
     pub fn hash_leaf(&self, data: Vec<u8>) -> Vec<u8> {
         let mut buf: Vec<u8> = Vec::new();
