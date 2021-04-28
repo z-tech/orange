@@ -27,14 +27,11 @@ impl<T: Storer> MerkleHashTree<T> {
         /*
             canonically, a tree of size zero has depth of negative one
         */
-        let width: isize = self.store.width();
-        if width == 0 {
-            return -1;
+        match self.store.width() {
+            0 => -1,
+            // note that width is num leaves in tree, min_num_bits(width) is essentially log2 operation
+            n => min_num_bits(n - 1),
         }
-        /*
-            note that width is num leaves in tree, min_num_bits(width) is essentially log2 operation
-        */
-        min_num_bits(width - 1)
     }
     pub fn root(&self) -> Vec<u8> {
         /*
