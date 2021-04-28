@@ -1,3 +1,4 @@
+#[cfg(test)]
 pub fn get_test_roots() -> Vec<Vec<u8>> {
     return vec![
         vec![
@@ -263,6 +264,7 @@ pub fn get_test_roots() -> Vec<Vec<u8>> {
     ];
 }
 
+#[cfg(test)]
 pub fn get_test_paths() -> Vec<Vec<Vec<Vec<u8>>>> {
     return vec![
         vec![vec![]],

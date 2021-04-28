@@ -8,7 +8,7 @@ pub struct MemStore {
 
 impl Storer for MemStore {
     fn new() -> MemStore {
-        return MemStore { data: vec![vec![]] };
+        MemStore { data: vec![vec![]] }
     }
     /*
         Note: width of the tree tells us how many values are in the ledger
@@ -27,7 +27,7 @@ impl Storer for MemStore {
             On the one hand, width is never -1 so it would make sense to do outside this function.
             On the other hand, we'd have to do it A LOT if we didn't do it here this one time.
         */
-        return isize::try_from(self.data[0].len()).unwrap();
+        isize::try_from(self.data[0].len()).unwrap()
     }
     fn set(&mut self, layer: isize, index: isize, value: Vec<u8>) {
         /*
@@ -49,7 +49,7 @@ impl Storer for MemStore {
         if layer as usize >= self.data.len() || index as usize >= self.data[layer as usize].len() {
             return None;
         }
-        return Some(self.data[layer as usize][index as usize].to_vec());
+        Some(self.data[layer as usize][index as usize].to_vec())
     }
     fn print(&self) {
         let mut tab: String;
