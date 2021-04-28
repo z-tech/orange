@@ -98,37 +98,28 @@ impl<T: Storer> MerkleHashTree<T> {
         digest(Algorithm::SHA256, &c)
     }
     pub fn inclusion_proof(&self, at: isize, i: isize) -> Option<Vec<Vec<u8>>> {
-        let width: isize = self.store.width();
         if at == 0 && i == 0 {
             return Some(vec![]);
         }
-        if i > at || at >= width || at < 1 {
+        if i > at || at >= self.store.width() || at < 1 {
             return None;
         }
 
-        let mut i1: isize = i;
-        let mut at1: isize = at + 1;
-
-        let mut offset: isize = 0;
-        let mut left: isize;
-        let mut right: isize;
+        let mut i1 = i;
+        let mut at1 = at + 1;
+        let mut offset = 0;
         let mut result: Vec<Vec<u8>> = Vec::new();
         loop {
-            let d: isize = min_num_bits(at1 - 1);
-            let k: isize = 1 << (d - 1);
+            let k: isize = 1 << (min_num_bits(at1 - 1) - 1);
             if i1 < k {
-                left = offset + k;
-                right = offset + at1 - 1;
+                result.insert(0, self.hash_at(offset + k, offset + at1 - 1, at));
                 at1 = k;
             } else {
-                left = offset;
-                right = offset + k - 1;
+                result.insert(0, self.hash_at(offset, offset + k - 1, at));
                 i1 -= k;
                 at1 -= k;
                 offset += k;
             }
-
-            result.insert(0, self.hash_at(left, right, at));
             if at1 < 1 || (at1 == 1 && i1 == 0) {
                 return Some(result);
             }
