@@ -49,33 +49,27 @@ impl<T: Storer> MerkleHashTree<T> {
         digest(Algorithm::SHA256, &buf)
     }
     pub fn append(&mut self, data: &[u8]) {
-        self.append_hash(self.hash_leaf(data));
-    }
-    fn append_hash(&mut self, leaf_hash: Vec<u8>) {
         // append the leaf
-        let mut width: isize = self.store.width();
+        let leaf_hash = self.hash_leaf(data);
+        let mut width = self.store.width();
         self.store.set(0, width, leaf_hash.to_vec());
         width += 1;
 
         // rebuild the root
-        let mut i: isize = 0;
-        let mut c: Vec<u8> = leaf_hash.to_vec();
-        let mut t: Vec<u8> = Vec::new();
+        let mut i = 0;
+        let mut hash = leaf_hash;
         while width > 1 {
             if width % 2 == 0 {
-                t.resize(1, MHT_NODE_PREFIX);
+                let mut t = vec![MHT_NODE_PREFIX];
                 t.extend(self.store.get(i, width - 2).unwrap());
-                t.extend(c.to_vec());
-                c.clear();
-                c.extend(digest(Algorithm::SHA256, &t));
-                i += 1;
-                width >>= 1;
-                self.store.set(i, width - 1, c.to_vec());
+                t.extend(&hash);
+                hash = digest(Algorithm::SHA256, &t);
+                self.store.set(i + 1, (width >> 1) - 1, hash.clone());
             } else {
                 width += 1;
-                i += 1;
-                width >>= 1;
             }
+            i += 1;
+            width >>= 1;
         }
     }
     pub fn is_frozen(layer: isize, index: isize, at: isize) -> bool {
