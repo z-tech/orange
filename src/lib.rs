@@ -84,18 +84,17 @@ impl<T: Storer> MerkleHashTree<T> {
             return self.store.get(0, r).unwrap();
         }
 
-        let layer: isize = min_num_bits(r - l); // height of subtree
-        let width: isize = 1 << layer; // width of subtree
+        let layer = min_num_bits(r - l); // height of subtree
+        let width = 1 << layer; // width of subtree
 
         if at >= l + width - 1 || at == self.store.width() - 1 {
             return self.store.get(layer, l / width).unwrap();
         }
 
-        let half_width: isize = width / 2;
-        let mut c: Vec<u8> = Vec::new();
-        c.push(MHT_NODE_PREFIX);
-        c.extend(self.hash_at(l, l + half_width - 1, at).iter().cloned());
-        c.extend(self.hash_at(l + half_width, r, at).iter().cloned());
+        let mid_point = width / 2;
+        let mut c = vec![MHT_NODE_PREFIX];
+        c.extend(self.hash_at(l, l + mid_point - 1, at));
+        c.extend(self.hash_at(l + mid_point, r, at));
         digest(Algorithm::SHA256, &c)
     }
     pub fn inclusion_proof(&self, at: isize, i: isize) -> Option<Vec<Vec<u8>>> {
