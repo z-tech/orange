@@ -20,6 +20,12 @@ fn min_num_bits(x: isize) -> isize {
     (ISIZE_BITS - x.leading_zeros()) as isize
 }
 
+fn hash_leaf(data: &[u8]) -> Vec<u8> {
+    let mut buf = vec![MHT_LEAF_PREFIX];
+    buf.extend(data);
+    digest(Algorithm::SHA256, &buf)
+}
+
 impl<T: Storer> MerkleHashTree<T> {
     pub fn new(s: T) -> MerkleHashTree<T> {
         MerkleHashTree { store: s }
@@ -43,14 +49,9 @@ impl<T: Storer> MerkleHashTree<T> {
             n => self.store.get(n, 0).unwrap(),
         }
     }
-    pub fn hash_leaf(&self, data: &[u8]) -> Vec<u8> {
-        let mut buf = vec![MHT_LEAF_PREFIX];
-        buf.extend(data);
-        digest(Algorithm::SHA256, &buf)
-    }
     pub fn append(&mut self, data: &[u8]) {
         // append the leaf
-        let leaf_hash = self.hash_leaf(data);
+        let leaf_hash = hash_leaf(data);
         let mut width = self.store.width();
         self.store.set(0, width, leaf_hash.to_vec());
         width += 1;
@@ -185,7 +186,7 @@ mod tests {
         assert_eq!(digest(Algorithm::SHA256, b""), mht.root());
         let value = "my value".as_bytes().to_vec();
         mht.append(&value);
-        assert_eq!(mht.hash_leaf(&value), mht.root());
+        assert_eq!(hash_leaf(&value), mht.root());
     }
     #[test]
     fn test_is_frozen() {
@@ -219,10 +220,7 @@ mod tests {
             return digest(Algorithm::SHA256, b"");
         }
         if n == 1 {
-            let mut c: Vec<u8> = Vec::new();
-            c.push(MHT_LEAF_PREFIX);
-            c.extend(d[0].to_vec());
-            return digest(Algorithm::SHA256, &c);
+            return hash_leaf(&d[0]);
         }
 
         let k: usize = 1 << (min_num_bits(n - 1) - 1);
