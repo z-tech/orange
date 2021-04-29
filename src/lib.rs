@@ -1,4 +1,4 @@
-mod store;
+pub mod store;
 
 use crypto_hash::{digest, Algorithm};
 

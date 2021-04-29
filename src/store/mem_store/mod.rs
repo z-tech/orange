@@ -2,14 +2,38 @@ use std::convert::TryFrom;
 
 use crate::store::Storer;
 
+#[derive(Debug)]
 pub struct MemStore {
     data: Vec<Vec<Vec<u8>>>,
 }
 
-impl Storer for MemStore {
-    fn new() -> MemStore {
+impl MemStore {
+    pub fn new() -> Self {
         MemStore { data: vec![vec![]] }
     }
+
+    pub fn print(&self) {
+        let mut tab: String;
+        let mut i: isize = isize::try_from(self.data.len()).unwrap() - 1;
+        while i >= 0 {
+            print!("{}", String::from("  ").repeat((1 << i) - 1));
+            tab = String::from("  ").repeat((1 << (i + 1)) - 1);
+            for layer in self.data[i as usize].iter() {
+                print!("{:?}{}", layer[0], tab);
+            }
+            println!();
+            i -= 1;
+        }
+    }
+}
+
+impl Default for MemStore {
+    fn default() -> Self {
+        MemStore::new()
+    }
+}
+
+impl Storer for MemStore {
     /*
         Note: width of the tree tells us how many values are in the ledger
         e.g.
@@ -50,19 +74,6 @@ impl Storer for MemStore {
             return None;
         }
         Some(self.data[layer as usize][index as usize].to_vec())
-    }
-    fn print(&self) {
-        let mut tab: String;
-        let mut i: isize = isize::try_from(self.data.len()).unwrap() - 1;
-        while i >= 0 {
-            print!("{}", String::from("  ").repeat((1 << i) - 1));
-            tab = String::from("  ").repeat((1 << (i + 1)) - 1);
-            for layer in self.data[i as usize].iter() {
-                print!("{:?}{}", layer[0], tab);
-            }
-            println!();
-            i -= 1;
-        }
     }
 }
 
