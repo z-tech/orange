@@ -1,6 +1,7 @@
 pub mod store;
 
-use crypto_hash::{digest, Algorithm};
+use crypto_hash::{digest, Algorithm, Hasher};
+use std::io::Write;
 
 use store::Storer;
 
@@ -21,16 +22,18 @@ fn min_num_bits(x: isize) -> isize {
 }
 
 fn hash_leaf(data: &[u8]) -> Vec<u8> {
-    let mut buf = vec![MHT_LEAF_PREFIX];
-    buf.extend(data);
-    digest(Algorithm::SHA256, &buf)
+    let mut hasher = Hasher::new(Algorithm::SHA256);
+    hasher.write_all(&[MHT_LEAF_PREFIX]).unwrap();
+    hasher.write_all(data).unwrap();
+    hasher.finish()
 }
 
 fn hash_node(left: &[u8], right: &[u8]) -> Vec<u8> {
-    let mut buf = vec![MHT_NODE_PREFIX];
-    buf.extend(left);
-    buf.extend(right);
-    digest(Algorithm::SHA256, &buf)
+    let mut hasher = Hasher::new(Algorithm::SHA256);
+    hasher.write_all(&[MHT_NODE_PREFIX]).unwrap();
+    hasher.write_all(left).unwrap();
+    hasher.write_all(right).unwrap();
+    hasher.finish()
 }
 
 impl<T: Storer> MerkleHashTree<T> {
