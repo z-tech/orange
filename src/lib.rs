@@ -380,4 +380,90 @@ mod tests {
             }
         }
     }
+    #[derive(Clone)]
+    struct Block {
+        prev_block_hash: Vec<u8>,
+        data: Vec<u8>,
+    }
+    #[test]
+    #[ignore]
+    fn time_linked_list_impl() {
+        // instantiate the blockchain and the "genesis" block (first block)
+        let mut block_chain: Vec<Block> = vec![];
+        block_chain.push(Block{
+            prev_block_hash: digest(Algorithm::SHA256, b""),
+            data: digest(Algorithm::SHA256, "0".to_string().as_bytes()),
+        });
+
+        // basically, for as long as we can let this run
+        let roughly_one_billion: isize = 2isize.pow(30);
+        for index in 1..=roughly_one_billion {
+
+            // convert index to bytes and use as the data
+            let v: Vec<u8> = index.to_string().as_bytes().to_vec();
+
+            let log_base_2: f64 = (index as f64).log2();
+            if log_base_2.fract() == 0.0 { // if perfect power of two then time the operations
+
+                // time commit
+                let n1 = Instant::now();
+
+                // represent last block as Vec<u8> by concatenating prev hash and data
+                let prev_block: Vec<u8> = [
+                    block_chain[index as usize - 1].prev_block_hash.clone(),
+                    block_chain[index as usize - 1].data.clone(),
+                ].concat();
+
+                // compute new prev hash and append the current block
+                block_chain.push(Block{
+                    prev_block_hash: digest(Algorithm::SHA256, &prev_block),
+                    data: digest(Algorithm::SHA256, &v),
+                });
+                println!("a, {}, {:?}", log_base_2, n1.elapsed());
+
+                // time retrieve path
+                let n2 = Instant::now();
+                let path: Vec<Block> = block_chain[0..index as usize].to_vec();
+                println!("b, {}, {:?}", log_base_2, n2.elapsed());
+
+                // time verify path
+                let n3 = Instant::now();
+                // verify membership of "0" (the worst-case)
+                let mut this_block: Vec<u8> = [
+                    block_chain[0].prev_block_hash.clone(),
+                    digest(Algorithm::SHA256, &"0".to_string().as_bytes().to_vec()), // this is what we're proving
+                ].concat();
+                for j in 1..index {
+                    // hashed contents of prev block become the "prev block" of current iteration
+                    this_block = digest(Algorithm::SHA256, &this_block)
+                    .into_iter()
+                    .chain(path[j as usize].clone().data.into_iter())
+                    .collect();
+                }
+                let computed_root: Vec<u8> = digest(Algorithm::SHA256, &this_block);
+
+                let root_block: Vec<u8> = [
+                    block_chain[index as usize - 1].prev_block_hash.clone(),
+                    block_chain[index as usize - 1].data.clone(),
+                ].concat();
+                let root_hash: Vec<u8> = digest(Algorithm::SHA256, &root_block);
+                assert_eq!(computed_root, root_hash);
+                println!("c, {}, {:?}", log_base_2, n3.elapsed());
+            } else { // else just append the data
+                // represent last block as Vec<u8> by concatenating prev hash and data
+                let prev_block: Vec<u8> = block_chain[index as usize - 1]
+                    .clone()
+                    .prev_block_hash
+                    .into_iter()
+                    .chain(block_chain[index as usize - 1].clone().data.into_iter())
+                    .collect();
+
+                // compute new prev hash and append the current block
+                block_chain.push(Block{
+                    prev_block_hash: digest(Algorithm::SHA256, &prev_block),
+                    data: v,
+                });
+            }
+        }
+    }
 }
