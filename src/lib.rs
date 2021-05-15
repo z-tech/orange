@@ -386,7 +386,7 @@ mod tests {
         data: Vec<u8>,
     }
     #[test]
-    //#[ignore]
+    #[ignore]
     fn time_linked_list_impl() {
         // instantiate the blockchain and the "genesis" block (first block)
         let mut block_chain: Vec<Block> = vec![];
